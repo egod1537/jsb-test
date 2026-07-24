@@ -1,6 +1,6 @@
 #pragma once
 
-#include <netinet/in.h>
+#include <memory>
 
 namespace JSBSim {
 class FGFDMExec;
@@ -19,7 +19,7 @@ public:
   bool Send(JSBSim::FGFDMExec &fdm);
 
 private:
-  int socketFd_ = -1;
-  sockaddr_in address_{};
+  class Impl;
+  std::unique_ptr<Impl> m_Impl;
 };
 } // namespace flightgear

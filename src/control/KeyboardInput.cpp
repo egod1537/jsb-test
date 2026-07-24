@@ -1,16 +1,27 @@
 #include "control/KeyboardInput.hpp"
 #include <algorithm>
+
+#ifdef _WIN32
+#include <conio.h>
+#else
 #include <termios.h>
 #include <unistd.h>
+#endif
 
 namespace control {
 KeyboardInput::~KeyboardInput() {
+#ifndef _WIN32
   if (initialized_) {
     tcsetattr(STDIN_FILENO, TCSANOW, &originalTerminal_);
   }
+#endif
 }
 
 bool KeyboardInput::Initialize() {
+#ifdef _WIN32
+  initialized_ = true;
+  return true;
+#else
   if (tcgetattr(STDIN_FILENO, &originalTerminal_) != 0) {
     return false;
   }
@@ -27,13 +38,19 @@ bool KeyboardInput::Initialize() {
 
   initialized_ = true;
   return true;
+#endif
 }
 
 bool KeyboardInput::Update(ControlInput &input) {
   char key = '\0';
   bool changed = false;
 
+#ifdef _WIN32
+  while (_kbhit() != 0) {
+    key = static_cast<char>(_getch());
+#else
   while (read(STDIN_FILENO, &key, 1) > 0) {
+#endif
     switch (key) {
     case 'w':
       input.elevator -= 0.05;

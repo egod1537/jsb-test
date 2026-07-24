@@ -1,0 +1,93 @@
+#pragma once
+
+#include "flightui/core/UIElement.hpp"
+#include "flightui/plot/DataView.hpp"
+
+#include <implot.h>
+
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace FlightUI {
+class PlotBuilder {
+public:
+  explicit PlotBuilder(std::string title);
+  PlotBuilder(const PlotBuilder &other);
+  PlotBuilder(PlotBuilder &&other) noexcept;
+  PlotBuilder &operator=(const PlotBuilder &other);
+  PlotBuilder &operator=(PlotBuilder &&other) noexcept;
+  ~PlotBuilder();
+
+  PlotBuilder &SetSize(Vector2 size);
+  PlotBuilder &SetWidth(float width);
+  PlotBuilder &SetHeight(float height);
+  PlotBuilder &SetXAxisLabel(std::string label);
+  PlotBuilder &SetYAxisLabel(std::string label);
+  PlotBuilder &SetXAxisFlags(ImPlotAxisFlags flags);
+  PlotBuilder &SetYAxisFlags(ImPlotAxisFlags flags);
+  PlotBuilder &SetXAxisLimits(double min, double max,
+      ImPlotCond cond = ImPlotCond_Once);
+  PlotBuilder &SetYAxisLimits(double min, double max,
+      ImPlotCond cond = ImPlotCond_Once);
+  PlotBuilder &SetFlags(ImPlotFlags flags);
+  PlotBuilder &SetLegendVisible(bool visible);
+  PlotBuilder &SetOffset(int offset);
+
+  PlotBuilder &Size(Vector2 size);
+  PlotBuilder &Width(float width);
+  PlotBuilder &Height(float height);
+  PlotBuilder &XAxisLabel(std::string label);
+  PlotBuilder &YAxisLabel(std::string label);
+  PlotBuilder &XAxisFlags(ImPlotAxisFlags flags);
+  PlotBuilder &YAxisFlags(ImPlotAxisFlags flags);
+  PlotBuilder &XAxisLimits(double min, double max,
+      ImPlotCond cond = ImPlotCond_Once);
+  PlotBuilder &YAxisLimits(double min, double max,
+      ImPlotCond cond = ImPlotCond_Once);
+  PlotBuilder &Flags(ImPlotFlags flags);
+  PlotBuilder &LegendVisible(bool visible);
+  PlotBuilder &Offset(int offset);
+
+  PlotBuilder &AddLine(std::string label, DataView xValues, DataView yValues);
+  PlotBuilder &AddLine(std::string label, DataView xValues, DataView yValues,
+      int offset);
+  PlotBuilder &AddLine(std::string label, DataView yValues);
+  PlotBuilder &AddLine(std::string label, DataView yValues, int offset);
+  PlotBuilder &AddLine(std::string label, const std::vector<double> &xValues,
+      const std::vector<double> &yValues);
+  PlotBuilder &AddLine(std::string label, const std::vector<double> &xValues,
+      const std::vector<double> &yValues, int offset);
+  PlotBuilder &AddLine(std::string label, const std::vector<float> &xValues,
+      const std::vector<float> &yValues);
+  PlotBuilder &AddLine(std::string label, const std::vector<float> &xValues,
+      const std::vector<float> &yValues, int offset);
+  PlotBuilder &AddLine(std::string label, const std::vector<double> &yValues);
+  PlotBuilder &AddLine(std::string label, const std::vector<double> &yValues,
+      int offset);
+  PlotBuilder &AddLine(std::string label, const std::vector<float> &yValues);
+  PlotBuilder &AddLine(std::string label, const std::vector<float> &yValues,
+      int offset);
+
+  PlotBuilder &AddScatter(std::string label, DataView xValues,
+      DataView yValues);
+  PlotBuilder &AddScatter(std::string label, DataView xValues, DataView yValues,
+      int offset);
+  PlotBuilder &AddScatter(std::string label, const std::vector<double> &xValues,
+      const std::vector<double> &yValues);
+  PlotBuilder &AddScatter(std::string label, const std::vector<double> &xValues,
+      const std::vector<double> &yValues, int offset);
+  PlotBuilder &AddScatter(std::string label, const std::vector<float> &xValues,
+      const std::vector<float> &yValues);
+  PlotBuilder &AddScatter(std::string label, const std::vector<float> &xValues,
+      const std::vector<float> &yValues, int offset);
+
+  operator UIElement() const;
+
+private:
+  class Impl;
+  std::unique_ptr<Impl> m_Impl;
+};
+
+PlotBuilder Plot(std::string title);
+} // namespace FlightUI

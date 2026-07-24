@@ -1,16 +1,13 @@
 #pragma once
 
-#include "control/ControlInput.hpp"
 #include "control/KeyboardInput.hpp"
 #include "flightgear/FlightGearSender.hpp"
-#include <csignal>
+#include "simulation/SimulationConfig.h"
 #include <memory>
 
-namespace JSBSim {
-class FGFDMExec;
-}
+namespace sim {
+class FlightDynamics;
 
-namespace simulation {
 class Simulation {
 public:
   Simulation();
@@ -19,23 +16,27 @@ public:
   Simulation(const Simulation &) = delete;
   Simulation &operator=(const Simulation &) = delete;
 
-  bool Initialize();
-  void Run(const volatile std::sig_atomic_t &running);
+  bool Start(const SimulationConfig &);
+  bool Update();
+  void Exit();
+
+  bool Initialize(const SimulationConfig &);
+
+  const SimulationConfig &GetConfig() const { return config_; }
+
+  FlightDynamics &GetFlightDynamics();
+  const FlightDynamics &GetFlightDynamics() const;
 
 private:
-  void ConfigurePaths();
-  bool LoadAircraft();
-  void ConfigureSimulation();
-  void ConfigureInitialConditions();
-  bool InitializeState();
   void PrintState() const;
 
-  void ApplyControlInput();
-
-  std::unique_ptr<JSBSim::FGFDMExec> fdm_;
+  std::unique_ptr<FlightDynamics> flightDynamics_;
   flightgear::FlightGearSender flightGearSender_;
 
-  control::ControlInput controlInput_;
   control::KeyboardInput keyboardInput_;
+
+  SimulationConfig config_;
+  double nextLogTime_ = 0.0;
+  bool started_ = false;
 };
-} // namespace simulation
+} // namespace sim

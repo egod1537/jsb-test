@@ -4,7 +4,6 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
-#include <netinet/in.h>
 
 namespace flightgear {
 constexpr std::uint32_t NET_FDM_VERSION = 24;
@@ -93,33 +92,49 @@ static_assert(sizeof(double) == 8);
 static_assert(sizeof(std::uint32_t) == 4);
 static_assert(sizeof(NetFdmPacket) == 408);
 
-inline std::uint32_t ToNetwork32(std::uint32_t value) { return htonl(value); }
+inline std::uint32_t ByteSwap32(std::uint32_t value) {
+  return ((value & 0x000000FFU) << 24) | ((value & 0x0000FF00U) << 8) |
+         ((value & 0x00FF0000U) >> 8) | ((value & 0xFF000000U) >> 24);
+}
+
+inline std::uint64_t ByteSwap64(std::uint64_t value) {
+  return ((value & 0x00000000000000FFULL) << 56) |
+         ((value & 0x000000000000FF00ULL) << 40) |
+         ((value & 0x0000000000FF0000ULL) << 24) |
+         ((value & 0x00000000FF000000ULL) << 8) |
+         ((value & 0x000000FF00000000ULL) >> 8) |
+         ((value & 0x0000FF0000000000ULL) >> 24) |
+         ((value & 0x00FF000000000000ULL) >> 40) |
+         ((value & 0xFF00000000000000ULL) >> 56);
+}
+
+inline std::uint32_t ToNetwork32(std::uint32_t value) {
+  if constexpr (std::endian::native == std::endian::big) {
+    return value;
+  }
+
+  return ByteSwap32(value);
+}
+
 inline float ToNetworkFloat(float value) {
   const auto bits = std::bit_cast<std::uint32_t>(value);
-  const auto networkBits = htonl(bits);
+  const auto networkBits = ToNetwork32(bits);
   return std::bit_cast<float>(networkBits);
 }
+
 inline double ToNetworkDouble(double value) {
   if constexpr (std::endian::native == std::endian::big) {
     return value;
   }
 
   auto bits = std::bit_cast<std::uint64_t>(value);
-
-  bits = ((bits & 0x00000000000000FFULL) << 56) |
-         ((bits & 0x000000000000FF00ULL) << 40) |
-         ((bits & 0x0000000000FF0000ULL) << 24) |
-         ((bits & 0x00000000FF000000ULL) << 8) |
-         ((bits & 0x000000FF00000000ULL) >> 8) |
-         ((bits & 0x0000FF0000000000ULL) >> 24) |
-         ((bits & 0x00FF000000000000ULL) >> 40) |
-         ((bits & 0xFF00000000000000ULL) >> 56);
-
+  bits = ByteSwap64(bits);
   return std::bit_cast<double>(bits);
 }
+
 inline std::int32_t ToNetworkInt32(std::int32_t value) {
   const auto bits = std::bit_cast<std::uint32_t>(value);
-  const auto networkBits = htonl(bits);
+  const auto networkBits = ToNetwork32(bits);
   return std::bit_cast<std::int32_t>(networkBits);
 }
 

@@ -1,0 +1,46 @@
+#pragma once
+
+#include "flightui/core/UIElement.hpp"
+
+#include <imgui.h>
+
+#include <memory>
+#include <string>
+
+namespace FlightUI {
+class FoldOutBuilder {
+public:
+  explicit FoldOutBuilder(std::string label);
+  FoldOutBuilder(const FoldOutBuilder &other);
+  FoldOutBuilder(FoldOutBuilder &&other) noexcept;
+  FoldOutBuilder &operator=(const FoldOutBuilder &other);
+  FoldOutBuilder &operator=(FoldOutBuilder &&other) noexcept;
+  ~FoldOutBuilder();
+
+  FoldOutBuilder &SetOpen(bool &isOpen);
+  FoldOutBuilder &SetDefaultOpen(bool open);
+  FoldOutBuilder &SetFlags(ImGuiTreeNodeFlags flags);
+  FoldOutBuilder &SetEnabled(bool enabled);
+  FoldOutBuilder &SetVisible(bool visible);
+  FoldOutBuilder &SetTooltip(std::string tooltip);
+  FoldOutBuilder &SetId(std::string id);
+
+  FoldOutBuilder &Open(bool &isOpen);
+  FoldOutBuilder &DefaultOpen(bool open = true);
+  FoldOutBuilder &Flags(ImGuiTreeNodeFlags flags);
+  FoldOutBuilder &Enabled(bool enabled);
+  FoldOutBuilder &Visible(bool visible);
+  FoldOutBuilder &Tooltip(std::string tooltip);
+  FoldOutBuilder &Id(std::string id);
+
+  UIElement operator[](UIElement child) const;
+  UIElement operator[](Children children) const;
+  UIElement operator[](ChildrenBuilder children) const;
+
+private:
+  class Impl;
+  std::unique_ptr<Impl> m_Impl;
+};
+
+FoldOutBuilder FoldOut(std::string label);
+} // namespace FlightUI

@@ -1,6 +1,11 @@
+#include "application/Application.hpp"
+#include "gui/GUI.hpp"
+#include "gui/GUIConfig.hpp"
 #include "simulation/Simulation.hpp"
+#include "simulation/SimulationConfig.h"
+
 #include <csignal>
-#include <iostream>
+#include <memory>
 
 namespace {
 volatile std::sig_atomic_t running = 1;
@@ -12,13 +17,12 @@ int main() {
   std::signal(SIGINT, HandleSignal);
   std::signal(SIGTERM, HandleSignal);
 
-  simulation::Simulation simulation;
+  sim::SimulationConfig simConfig;
+  gui::GUIConfig guiConfig;
+  std::unique_ptr<sim::Simulation> sim = std::make_unique<sim::Simulation>();
+  std::unique_ptr<gui::GUI> gui =
+      std::make_unique<gui::GUI>(sim.get(), guiConfig);
 
-  if (!simulation.Initialize()) {
-    std::cerr << "Failed to initialize simulation\n";
-    return 1;
-  }
-
-  simulation.Run(running);
-  return 0;
+  Application app(std::move(gui), std::move(sim), simConfig);
+  return app.Run(running) ? 0 : 1;
 }

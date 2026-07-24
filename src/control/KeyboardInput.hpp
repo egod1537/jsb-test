@@ -1,7 +1,10 @@
 #pragma once
 
 #include "control/ControlInput.hpp"
+
+#ifndef _WIN32
 #include <termios.h>
+#endif
 
 namespace control {
 class KeyboardInput {
@@ -16,7 +19,9 @@ public:
   bool Update(ControlInput &input);
 
 private:
+#ifndef _WIN32
   termios originalTerminal_{};
+#endif
   bool initialized_ = false;
 };
 } // namespace control
