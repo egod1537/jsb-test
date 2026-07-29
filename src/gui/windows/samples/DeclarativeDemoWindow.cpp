@@ -3,8 +3,6 @@
 #include "flightui/FlightUI.hpp"
 #include "gui/GUI.hpp"
 
-#include <imgui.h>
-
 namespace gui {
 namespace UI = FlightUI;
 
@@ -83,7 +81,7 @@ void DeclarativeDemoWindow::Update(GUI &) {
 }
 
 void DeclarativeDemoWindow::AppendTelemetrySample() {
-  const double time = ImGui::GetTime();
+  const double time = UI::GetTime();
   if (lastSampleTime_ >= 0.0 && time - lastSampleTime_ < SampleIntervalSec) {
     return;
   }

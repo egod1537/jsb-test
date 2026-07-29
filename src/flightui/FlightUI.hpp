@@ -2,7 +2,9 @@
 
 #include "flightui/controls/Button.hpp"
 #include "flightui/controls/Custom.hpp"
+#include "flightui/controls/Combo.hpp"
 #include "flightui/controls/Heading.hpp"
+#include "flightui/controls/Input.hpp"
 #include "flightui/controls/Separator.hpp"
 #include "flightui/controls/Slider.hpp"
 #include "flightui/controls/Space.hpp"
@@ -13,6 +15,7 @@
 #include "flightui/core/UIElement.hpp"
 #include "flightui/layout/FoldOut.hpp"
 #include "flightui/layout/HorizontalLayout.hpp"
+#include "flightui/layout/KeyValueGrid.hpp"
 #include "flightui/layout/Panel.hpp"
 #include "flightui/layout/TabGroup.hpp"
 #include "flightui/layout/VerticalLayout.hpp"

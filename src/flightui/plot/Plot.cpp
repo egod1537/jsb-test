@@ -248,6 +248,41 @@ PlotBuilder &PlotBuilder::SetFlags(ImPlotFlags flags) {
   return *this;
 }
 
+PlotBuilder &PlotBuilder::SetFixedView(bool enabled) {
+  constexpr ImPlotFlags fixedViewFlags =
+      ImPlotFlags_NoInputs | ImPlotFlags_NoMenus | ImPlotFlags_NoBoxSelect
+      | ImPlotFlags_NoTitle;
+
+  if (enabled) {
+    m_Impl->Flags |= fixedViewFlags;
+  } else {
+    m_Impl->Flags &= ~fixedViewFlags;
+  }
+
+  return *this;
+}
+
+PlotBuilder &PlotBuilder::SetFocusedYAxis(bool enabled) {
+  constexpr ImPlotAxisFlags focusedYAxisFlags =
+      ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_RangeFit;
+
+  if (enabled) {
+    m_Impl->YAxisFlags |= focusedYAxisFlags;
+  } else {
+    m_Impl->YAxisFlags &= ~focusedYAxisFlags;
+  }
+
+  return *this;
+}
+
+PlotBuilder &PlotBuilder::SetXAxisLimitsAlways(double min, double max) {
+  return SetXAxisLimits(min, max, ImPlotCond_Always);
+}
+
+PlotBuilder &PlotBuilder::SetYAxisLimitsAlways(double min, double max) {
+  return SetYAxisLimits(min, max, ImPlotCond_Always);
+}
+
 PlotBuilder &PlotBuilder::SetLegendVisible(bool visible) {
   m_Impl->LegendVisible = visible;
   return *this;
@@ -283,17 +318,31 @@ PlotBuilder &PlotBuilder::YAxisFlags(ImPlotAxisFlags flags) {
   return SetYAxisFlags(flags);
 }
 
-PlotBuilder &PlotBuilder::XAxisLimits(double min, double max,
-    ImPlotCond cond) {
+PlotBuilder &PlotBuilder::XAxisLimits(double min, double max, ImPlotCond cond) {
   return SetXAxisLimits(min, max, cond);
 }
 
-PlotBuilder &PlotBuilder::YAxisLimits(double min, double max,
-    ImPlotCond cond) {
+PlotBuilder &PlotBuilder::YAxisLimits(double min, double max, ImPlotCond cond) {
   return SetYAxisLimits(min, max, cond);
 }
 
 PlotBuilder &PlotBuilder::Flags(ImPlotFlags flags) { return SetFlags(flags); }
+
+PlotBuilder &PlotBuilder::FixedView(bool enabled) {
+  return SetFixedView(enabled);
+}
+
+PlotBuilder &PlotBuilder::FocusedYAxis(bool enabled) {
+  return SetFocusedYAxis(enabled);
+}
+
+PlotBuilder &PlotBuilder::XAxisLimitsAlways(double min, double max) {
+  return SetXAxisLimitsAlways(min, max);
+}
+
+PlotBuilder &PlotBuilder::YAxisLimitsAlways(double min, double max) {
+  return SetYAxisLimitsAlways(min, max);
+}
 
 PlotBuilder &PlotBuilder::LegendVisible(bool visible) {
   return SetLegendVisible(visible);

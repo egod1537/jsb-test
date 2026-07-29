@@ -1,9 +1,7 @@
 #include "GUI.hpp"
-#include "gui/windows/FlightConsoleWindow.hpp"
-#include "gui/windows/FlightControlWindow.hpp"
 #include "gui/windows/GNCWindow.hpp"
+#include "gui/windows/SimulationWindow.hpp"
 #include "gui/windows/monitor/FlightDataMonitorWindow.hpp"
-#include "gui/windows/samples/SamplePlotWindow.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -19,7 +17,7 @@ namespace gui {
 // public
 GUI::GUI(sim::Simulation *sim, GUIConfig config)
     : sim_(sim), config_(std::move(config)) {
-  RegisterWindow<FlightControlWindow>();
+  RegisterWindow<SimulationWindow>();
   RegisterWindow<GNCWindow>();
   RegisterWindow<FlightDataMonitorWindow>();
 }
@@ -139,11 +137,22 @@ void GUI::RegisterComponent(std::unique_ptr<Component> component) {
 }
 
 void GUI::RegisterWindow(std::unique_ptr<Window> window) {
+  if (window == nullptr) {
+    return;
+  }
+
+  windows_.push_back(window.get());
   RegisterComponent(std::move(window));
 }
 
 bool GUI::ShouldClose() const {
   return window_ == nullptr || glfwWindowShouldClose(window_);
+}
+
+void GUI::RequestClose() {
+  if (window_ != nullptr) {
+    glfwSetWindowShouldClose(window_, GLFW_TRUE);
+  }
 }
 
 void GUI::BeginFrame() {
@@ -162,6 +171,7 @@ void GUI::RenderFrame() {
     return;
   }
 
+  RenderMainMenuBar();
   UpdateComponents();
 }
 
@@ -188,6 +198,82 @@ void GUI::EndFrame() {
 }
 
 // private
+void GUI::RenderMainMenuBar() {
+  if (!ImGui::BeginMainMenuBar()) {
+    return;
+  }
+
+  RenderSimulationMenu();
+  RenderWindowMenu();
+
+  ImGui::EndMainMenuBar();
+}
+
+void GUI::RenderSimulationMenu() {
+  if (!ImGui::BeginMenu("Simulation")) {
+    return;
+  }
+
+  auto &simulation = GetSimulation();
+
+  ImGui::BeginDisabled(!simulation.IsRunning());
+  if (ImGui::MenuItem("Pause")) {
+    simulation.Pause();
+  }
+  ImGui::EndDisabled();
+
+  ImGui::BeginDisabled(!simulation.IsPaused());
+  if (ImGui::MenuItem("Resume")) {
+    simulation.Resume();
+  }
+  if (ImGui::MenuItem("Step Once")) {
+    simulation.RequestStep();
+  }
+  ImGui::EndDisabled();
+
+  ImGui::BeginDisabled(simulation.IsStopped());
+  if (ImGui::MenuItem("Restart")) {
+    simulation.Restart();
+  }
+  ImGui::EndDisabled();
+
+  ImGui::Separator();
+
+  if (ImGui::MenuItem("Exit")) {
+    RequestClose();
+  }
+
+  ImGui::EndMenu();
+}
+
+void GUI::RenderWindowMenu() {
+  if (!ImGui::BeginMenu("Window")) {
+    return;
+  }
+
+  for (Window *window : windows_) {
+    ImGui::MenuItem(window->GetTitle().c_str(),
+        nullptr,
+        window->GetVisiblePtr());
+  }
+
+  ImGui::Separator();
+
+  if (ImGui::MenuItem("Show All")) {
+    for (Window *window : windows_) {
+      window->SetVisible(true);
+    }
+  }
+
+  if (ImGui::MenuItem("Hide All")) {
+    for (Window *window : windows_) {
+      window->SetVisible(false);
+    }
+  }
+
+  ImGui::EndMenu();
+}
+
 void GUI::StartComponents() {
   for (const auto &component : components_) {
     component->StartIfNeeded(*this);

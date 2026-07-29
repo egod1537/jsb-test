@@ -3,10 +3,7 @@
 #include "flightui/core/UIElement.hpp"
 #include "flightui/plot/RingBuffer.hpp"
 #include "gui/Window.hpp"
-
-namespace JSBSim {
-class FlightProperties;
-}
+#include "simulation/AircraftState.hpp"
 
 namespace sim {
 class Simulation;
@@ -26,7 +23,7 @@ private:
   FlightUI::UIElement DrawBodyRatesPlot() const;
   FlightUI::UIElement DrawBodyAccelerationsPlot() const;
   FlightUI::UIElement DrawAngularAccelerationsPlot() const;
-  void DrawCurrentValues(const JSBSim::FlightProperties &prop) const;
+  void DrawCurrentValues(const sim::AircraftState &state) const;
   void DrawWindow(sim::Simulation &sim) const;
   void OnRecordSamples(sim::Simulation &sim);
 

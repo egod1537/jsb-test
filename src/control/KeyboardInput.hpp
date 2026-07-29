@@ -1,12 +1,12 @@
 #pragma once
 
-#include "control/ControlInput.hpp"
-
 #ifndef _WIN32
 #include <termios.h>
 #endif
 
 namespace control {
+class ControlInputStrategy;
+
 class KeyboardInput {
 public:
   KeyboardInput() = default;
@@ -16,7 +16,8 @@ public:
   KeyboardInput &operator=(const KeyboardInput &) = delete;
 
   bool Initialize();
-  bool Update(ControlInput &input);
+  void Shutdown();
+  bool Update(ControlInputStrategy &strategy);
 
 private:
 #ifndef _WIN32

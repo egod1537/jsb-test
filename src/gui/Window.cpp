@@ -7,17 +7,14 @@ Window::Window(std::string title) : title_(std::move(title)) {}
 Window::~Window() = default;
 
 void Window::Update(GUI &gui) {
-  if (!open_) {
+  if (!visible_) {
     return;
   }
 
-  bool isOpen = open_;
-  if (ImGui::Begin(title_.c_str(), &isOpen, GetWindowFlags())) {
+  if (ImGui::Begin(title_.c_str(), &visible_, GetWindowFlags())) {
     OnUpdate(gui);
   }
   ImGui::End();
-
-  open_ = isOpen;
 }
 
 ImGuiWindowFlags Window::GetWindowFlags() const {

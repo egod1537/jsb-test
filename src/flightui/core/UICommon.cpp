@@ -48,3 +48,42 @@ void ShowTooltipIfHovered(const std::string &tooltip) {
   ImGui::SetTooltip("%s", tooltip.c_str());
 }
 } // namespace FlightUI::Internal
+
+namespace FlightUI {
+double GetTime() { return ImGui::GetTime(); }
+
+namespace {
+ImGuiKey ToImGuiKey(Key key) {
+  switch (key) {
+  case Key::A:
+    return ImGuiKey_A;
+  case Key::D:
+    return ImGuiKey_D;
+  case Key::E:
+    return ImGuiKey_E;
+  case Key::F:
+    return ImGuiKey_F;
+  case Key::Q:
+    return ImGuiKey_Q;
+  case Key::R:
+    return ImGuiKey_R;
+  case Key::S:
+    return ImGuiKey_S;
+  case Key::W:
+    return ImGuiKey_W;
+  }
+
+  return ImGuiKey_None;
+}
+} // namespace
+
+bool IsKeyPressed(Key key, bool repeat) {
+  return ImGui::IsKeyPressed(ToImGuiKey(key), repeat);
+}
+
+bool IsCurrentWindowFocused() {
+  return ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+}
+
+bool WantsTextInput() { return ImGui::GetIO().WantTextInput; }
+} // namespace FlightUI

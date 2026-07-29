@@ -24,6 +24,7 @@ public:
   void Exit();
 
   bool ShouldClose() const;
+  void RequestClose();
 
   const GUIConfig &GetConfig() const { return config_; }
 
@@ -58,6 +59,9 @@ private:
   void RenderFrame();
   void EndFrame();
 
+  void RenderMainMenuBar();
+  void RenderSimulationMenu();
+  void RenderWindowMenu();
   void StartComponents();
   void UpdateComponents();
 
@@ -69,6 +73,7 @@ private:
   bool openGlBackendInitialized_ = false;
 
   std::vector<std::unique_ptr<Component>> components_;
+  std::vector<Window *> windows_;
   sim::Simulation *sim_;
   GUIConfig config_;
 };

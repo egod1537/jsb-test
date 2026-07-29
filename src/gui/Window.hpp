@@ -12,8 +12,9 @@ public:
 
   const std::string &GetTitle() const { return title_; }
 
-  bool IsOpen() const { return open_; }
-  void SetOpen(bool open) { open_ = open; }
+  bool IsVisible() const { return visible_; }
+  void SetVisible(bool visible) { visible_ = visible; }
+  bool *GetVisiblePtr() { return &visible_; }
 
 protected:
   void Update(GUI &gui) final;
@@ -23,6 +24,6 @@ protected:
 
 private:
   std::string title_;
-  bool open_ = true;
+  bool visible_ = true;
 };
 } // namespace gui

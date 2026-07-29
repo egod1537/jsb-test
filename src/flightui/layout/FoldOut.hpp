@@ -20,6 +20,8 @@ public:
   FoldOutBuilder &SetOpen(bool &isOpen);
   FoldOutBuilder &SetDefaultOpen(bool open);
   FoldOutBuilder &SetFlags(ImGuiTreeNodeFlags flags);
+  FoldOutBuilder &SetFramed(bool enabled = true);
+  FoldOutBuilder &SetSpanAvailWidth(bool enabled = true);
   FoldOutBuilder &SetEnabled(bool enabled);
   FoldOutBuilder &SetVisible(bool visible);
   FoldOutBuilder &SetTooltip(std::string tooltip);
@@ -28,6 +30,8 @@ public:
   FoldOutBuilder &Open(bool &isOpen);
   FoldOutBuilder &DefaultOpen(bool open = true);
   FoldOutBuilder &Flags(ImGuiTreeNodeFlags flags);
+  FoldOutBuilder &Framed(bool enabled = true);
+  FoldOutBuilder &SpanAvailWidth(bool enabled = true);
   FoldOutBuilder &Enabled(bool enabled);
   FoldOutBuilder &Visible(bool visible);
   FoldOutBuilder &Tooltip(std::string tooltip);

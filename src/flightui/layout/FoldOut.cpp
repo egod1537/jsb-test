@@ -54,8 +54,8 @@ FoldOutBuilder &FoldOutBuilder::operator=(const FoldOutBuilder &other) {
   return *this;
 }
 
-FoldOutBuilder &
-FoldOutBuilder::operator=(FoldOutBuilder &&other) noexcept = default;
+FoldOutBuilder &FoldOutBuilder::operator=(
+    FoldOutBuilder &&other) noexcept = default;
 
 FoldOutBuilder::~FoldOutBuilder() = default;
 
@@ -71,6 +71,26 @@ FoldOutBuilder &FoldOutBuilder::SetDefaultOpen(bool open) {
 
 FoldOutBuilder &FoldOutBuilder::SetFlags(ImGuiTreeNodeFlags flags) {
   m_Impl->Flags = flags;
+  return *this;
+}
+
+FoldOutBuilder &FoldOutBuilder::SetFramed(bool enabled) {
+  if (enabled) {
+    m_Impl->Flags |= ImGuiTreeNodeFlags_Framed;
+  } else {
+    m_Impl->Flags &= ~ImGuiTreeNodeFlags_Framed;
+  }
+
+  return *this;
+}
+
+FoldOutBuilder &FoldOutBuilder::SetSpanAvailWidth(bool enabled) {
+  if (enabled) {
+    m_Impl->Flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
+  } else {
+    m_Impl->Flags &= ~ImGuiTreeNodeFlags_SpanAvailWidth;
+  }
+
   return *this;
 }
 
@@ -94,9 +114,7 @@ FoldOutBuilder &FoldOutBuilder::SetId(std::string id) {
   return *this;
 }
 
-FoldOutBuilder &FoldOutBuilder::Open(bool &isOpen) {
-  return SetOpen(isOpen);
-}
+FoldOutBuilder &FoldOutBuilder::Open(bool &isOpen) { return SetOpen(isOpen); }
 
 FoldOutBuilder &FoldOutBuilder::DefaultOpen(bool open) {
   return SetDefaultOpen(open);
@@ -104,6 +122,14 @@ FoldOutBuilder &FoldOutBuilder::DefaultOpen(bool open) {
 
 FoldOutBuilder &FoldOutBuilder::Flags(ImGuiTreeNodeFlags flags) {
   return SetFlags(flags);
+}
+
+FoldOutBuilder &FoldOutBuilder::Framed(bool enabled) {
+  return SetFramed(enabled);
+}
+
+FoldOutBuilder &FoldOutBuilder::SpanAvailWidth(bool enabled) {
+  return SetSpanAvailWidth(enabled);
 }
 
 FoldOutBuilder &FoldOutBuilder::Enabled(bool enabled) {

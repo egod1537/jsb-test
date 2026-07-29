@@ -6,8 +6,8 @@
 #include "flightui/layout/VerticalLayout.hpp"
 #include "flightui/plot/Plot.hpp"
 #include "gui/GUI.hpp"
-#include "simulation/FlightDynamics.hpp"
-#include "imgui.h"
+#include "simulation/Aircraft.hpp"
+#include "simulation/AircraftState.hpp"
 #include "simulation/Simulation.hpp"
 
 #include <cstddef>
@@ -19,16 +19,6 @@ namespace {
 constexpr float PlotHeight = 245.0f;
 constexpr float ValueSpacing = 24.0f;
 constexpr std::size_t VisiblePlotSampleCount = 300;
-constexpr ImPlotFlags FixedPlotFlags =
-    ImPlotFlags_NoInputs | ImPlotFlags_NoMenus | ImPlotFlags_NoBoxSelect
-    | ImPlotFlags_NoTitle;
-constexpr ImPlotAxisFlags FocusedYAxisFlags =
-    ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_RangeFit;
-constexpr ImGuiTableFlags PlotTableFlags = ImGuiTableFlags_SizingStretchSame
-                                           | ImGuiTableFlags_NoSavedSettings
-                                           | ImGuiTableFlags_PadOuterX;
-constexpr ImGuiTreeNodeFlags PlotFoldOutFlags =
-    ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth;
 
 struct TimeRange {
   double Min = 0.0;
@@ -55,7 +45,7 @@ TimeRange GetFocusedTimeRange(const ds::RingBuffer<double> &timeHistory) {
 } // namespace
 
 FlightDataMonitorWindow::FlightDataMonitorWindow()
-    : gui::Window("Flight Data Monitor"), timeHistory_(VisiblePlotSampleCount),
+    : gui::Window("Monitor"), timeHistory_(VisiblePlotSampleCount),
       alphaDegHistory_(VisiblePlotSampleCount),
       betaDegHistory_(VisiblePlotSampleCount),
       pDegPerSecHistory_(VisiblePlotSampleCount),
@@ -80,9 +70,9 @@ UI::UIElement FlightDataMonitorWindow::DrawAerodynamicAnglesPlot() const {
 
   return UI::Plot("Aerodynamic Angles")
       .Height(PlotHeight)
-      .Flags(FixedPlotFlags)
-      .XAxisLimits(timeRange.Min, timeRange.Max, ImPlotCond_Always)
-      .YAxisFlags(FocusedYAxisFlags)
+      .FixedView()
+      .XAxisLimitsAlways(timeRange.Min, timeRange.Max)
+      .FocusedYAxis()
       .XAxisLabel("Time (s)")
       .YAxisLabel("deg")
       .AddLine("alpha",
@@ -101,9 +91,9 @@ UI::UIElement FlightDataMonitorWindow::DrawBodyRatesPlot() const {
 
   return UI::Plot("Body Rates")
       .Height(PlotHeight)
-      .Flags(FixedPlotFlags)
-      .XAxisLimits(timeRange.Min, timeRange.Max, ImPlotCond_Always)
-      .YAxisFlags(FocusedYAxisFlags)
+      .FixedView()
+      .XAxisLimitsAlways(timeRange.Min, timeRange.Max)
+      .FocusedYAxis()
       .XAxisLabel("Time (s)")
       .YAxisLabel("deg/s")
       .AddLine("p",
@@ -126,9 +116,9 @@ UI::UIElement FlightDataMonitorWindow::DrawBodyAccelerationsPlot() const {
 
   return UI::Plot("Body Accelerations")
       .Height(PlotHeight)
-      .Flags(FixedPlotFlags)
-      .XAxisLimits(timeRange.Min, timeRange.Max, ImPlotCond_Always)
-      .YAxisFlags(FocusedYAxisFlags)
+      .FixedView()
+      .XAxisLimitsAlways(timeRange.Min, timeRange.Max)
+      .FocusedYAxis()
       .XAxisLabel("Time (s)")
       .YAxisLabel("m/s^2")
       .AddLine("u_dot",
@@ -151,9 +141,9 @@ UI::UIElement FlightDataMonitorWindow::DrawAngularAccelerationsPlot() const {
 
   return UI::Plot("Angular Accelerations")
       .Height(PlotHeight)
-      .Flags(FixedPlotFlags)
-      .XAxisLimits(timeRange.Min, timeRange.Max, ImPlotCond_Always)
-      .YAxisFlags(FocusedYAxisFlags)
+      .FixedView()
+      .XAxisLimitsAlways(timeRange.Min, timeRange.Max)
+      .FocusedYAxis()
       .XAxisLabel("Time (s)")
       .YAxisLabel("deg/s^2")
       .AddLine("p_dot",
@@ -171,73 +161,62 @@ UI::UIElement FlightDataMonitorWindow::DrawAngularAccelerationsPlot() const {
 }
 
 void FlightDataMonitorWindow::DrawCurrentValues(
-    const JSBSim::FlightProperties &prop) const {
+    const sim::AircraftState &state) const {
   UI::HorizontalLayout()
       .Spacing(ValueSpacing)
-      [
-          +UI::ValueLabel(
-              "Sim Time",
-              prop.GetSimTimeSec(),
-              "{:.2f}"
-          )
-          +UI::ValueLabel(
-              "u (m/s)",
-              prop.GetUMps(),
-              "{:.2f}"
-          )
-          +UI::ValueLabel(
-              "v (m/s)",
-              prop.GetVMps(),
-              "{:.2f}"
-          )
-          +UI::ValueLabel(
-              "w (m/s)",
-              prop.GetWMps(),
-              "{:.2f}"
-          )
-      ]
+          [+UI::ValueLabel("Sim Time", state.simulationTimeSec, "{:.2f}")
+              + UI::ValueLabel("u (m/s)", state.uMps, "{:.2f}")
+              + UI::ValueLabel("v (m/s)", state.vMps, "{:.2f}")
+              + UI::ValueLabel("w (m/s)", state.wMps, "{:.2f}")]
       .Render();
 }
 
 void FlightDataMonitorWindow::DrawWindow(sim::Simulation &sim) const {
-  const auto &prop = sim.GetFlightDynamics().GetProperties();
+  const sim::AircraftState aircraftState =
+      sim.GetAircraft().GetAircraftState();
 
   UI::VerticalLayout()
-      .Spacing(8.0f)
-          [+UI::Custom([this, &prop] { DrawCurrentValues(prop); })
-              + UI::VerticalLayout()
-                  [+UI::FoldOut("Aerodynamic Angles")
-                          .DefaultOpen()
-                          .Flags(PlotFoldOutFlags)[DrawAerodynamicAnglesPlot()]
-                      + UI::FoldOut("Body Rates")
-                          .DefaultOpen()
-                          .Flags(PlotFoldOutFlags)[DrawBodyRatesPlot()]
-                      + UI::FoldOut("Body Accelerations")
-                          .DefaultOpen()
-                          .Flags(PlotFoldOutFlags)[DrawBodyAccelerationsPlot()]
+      .Spacing(
+          8.0f)[+UI::Custom(
+                    [this, aircraftState] { DrawCurrentValues(aircraftState); })
+                + UI::VerticalLayout()
+                    [+UI::FoldOut("Aerodynamic Angles")
+                            .DefaultOpen()
+                            .Framed()
+                            .SpanAvailWidth()[DrawAerodynamicAnglesPlot()]
+                        + UI::FoldOut("Body Rates")
+                            .DefaultOpen()
+                            .Framed()
+                            .SpanAvailWidth()[DrawBodyRatesPlot()]
+                        + UI::FoldOut("Body Accelerations")
+                            .DefaultOpen()
+                            .Framed()
+                            .SpanAvailWidth()[DrawBodyAccelerationsPlot()]
 
-                      + UI::FoldOut("Angular Accelerations")
-                          .DefaultOpen()
-                          .Flags(PlotFoldOutFlags)
-                              [DrawAngularAccelerationsPlot()]]]
+                        + UI::FoldOut("Angular Accelerations")
+                            .DefaultOpen()
+                            .Framed()
+                            .SpanAvailWidth()[DrawAngularAccelerationsPlot()]]]
       .Render();
 }
 
 void FlightDataMonitorWindow::OnRecordSamples(sim::Simulation &sim) {
-  const auto &prop = sim.GetFlightDynamics().GetProperties();
+  const sim::AircraftState state = sim.GetAircraft().GetAircraftState();
+  const sim::AircraftStateDerivative derivative =
+      sim.GetAircraft().GetAircraftStateDerivative();
 
-  timeHistory_.push_back(prop.GetSimTimeSec());
-  alphaDegHistory_.push_back(prop.GetAlphaDeg());
-  betaDegHistory_.push_back(prop.GetBetaDeg());
-  pDegPerSecHistory_.push_back(prop.GetPDegPerSec());
-  qDegPerSecHistory_.push_back(prop.GetQDegPerSec());
-  rDegPerSecHistory_.push_back(prop.GetRDegPerSec());
-  uDotMps2History_.push_back(prop.GetUDotMps2());
-  vDotMps2History_.push_back(prop.GetVDotMps2());
-  wDotMps2History_.push_back(prop.GetWDotMps2());
-  pDotDegPerSec2History_.push_back(prop.GetPdotDegPerSec2());
-  qDotDegPerSec2History_.push_back(prop.GetQdotDegPerSec2());
-  rDotDegPerSec2History_.push_back(prop.GetRdotDegPerSec2());
+  timeHistory_.push_back(state.simulationTimeSec);
+  alphaDegHistory_.push_back(state.alphaDeg);
+  betaDegHistory_.push_back(state.betaDeg);
+  pDegPerSecHistory_.push_back(state.pDegPerSec);
+  qDegPerSecHistory_.push_back(state.qDegPerSec);
+  rDegPerSecHistory_.push_back(state.rDegPerSec);
+  uDotMps2History_.push_back(derivative.uDotMps2);
+  vDotMps2History_.push_back(derivative.vDotMps2);
+  wDotMps2History_.push_back(derivative.wDotMps2);
+  pDotDegPerSec2History_.push_back(derivative.pDotDegPerSec2);
+  qDotDegPerSec2History_.push_back(derivative.qDotDegPerSec2);
+  rDotDegPerSec2History_.push_back(derivative.rDotDegPerSec2);
 }
 
 } // namespace gui

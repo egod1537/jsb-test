@@ -1,7 +1,6 @@
 #include "gui/windows/samples/SamplePlotWindow.hpp"
 #include "flightui/FlightUI.hpp"
 #include "gui/GUI.hpp"
-#include "imgui.h"
 #include <array>
 #include <cmath>
 
@@ -16,7 +15,7 @@ void SamplePlotWindow::OnUpdate(GUI &) {
   std::array<double, POINT_COUNT> xs{};
   std::array<double, POINT_COUNT> ys{};
 
-  const double time = ImGui::GetTime();
+  const double time = UI::GetTime();
   for (int index = 0; index < POINT_COUNT; ++index) {
     xs[index] = static_cast<double>(index) / 24.0;
     ys[index] = std::sin(xs[index] + time);

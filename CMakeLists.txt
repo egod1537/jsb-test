@@ -73,6 +73,7 @@ add_library(
   src/flightui/layout/Window.cpp
   src/flightui/layout/Panel.cpp
   src/flightui/layout/FoldOut.cpp
+  src/flightui/layout/KeyValueGrid.cpp
   src/flightui/layout/TabGroup.cpp
   src/flightui/layout/VerticalLayout.cpp
   src/flightui/layout/HorizontalLayout.cpp
@@ -80,7 +81,9 @@ add_library(
   src/flightui/controls/Heading.cpp
   src/flightui/controls/ValueLabel.cpp
   src/flightui/controls/Button.cpp
+  src/flightui/controls/Combo.cpp
   src/flightui/controls/Toggle.cpp
+  src/flightui/controls/Input.cpp
   src/flightui/controls/Slider.cpp
   src/flightui/controls/Separator.cpp
   src/flightui/controls/Space.cpp
@@ -112,10 +115,14 @@ add_executable(
   jsb-flight-console
   src/main.cpp
   src/application/Application.cpp
-  src/simulation/FlightDynamics.cpp
+  src/simulation/Aircraft.cpp
+  src/simulation/Context.cpp
+  src/gnc/TrimSolver.cpp
+  src/gnc/RollHoldSystem.cpp
+  src/state/TrueStateProvider.cpp
   src/gui/GUI.cpp
   src/gui/Window.cpp
-  src/gui/windows/FlightControlWindow.cpp
+  src/gui/windows/SimulationWindow.cpp
   src/gui/windows/FlightConsoleWindow.cpp
   src/gui/windows/monitor/FlightDataMonitorWindow.cpp
   src/gui/windows/GNCWindow.cpp
@@ -124,8 +131,11 @@ add_executable(
   src/jsbsim/FlightControls.cpp
   src/jsbsim/FlightProperties.cpp
   src/flightgear/FlightGearSender.cpp
+  src/flightgear/FlightGearSystem.cpp
   src/simulation/Simulation.cpp
   src/control/KeyboardInput.cpp
+  src/control/KeyboardInputSystem.cpp
+  src/control/ManualControlInputStrategy.cpp
 )
 
 target_compile_features(
@@ -172,6 +182,55 @@ target_link_libraries(
 add_test(
   NAME flightui_tests
   COMMAND flightui_tests
+)
+
+add_executable(
+  simulation_tests
+  tests/SimulationTests.cpp
+  src/simulation/Simulation.cpp
+  src/simulation/Aircraft.cpp
+  src/simulation/Context.cpp
+  src/state/TrueStateProvider.cpp
+  src/jsbsim/FlightControls.cpp
+  src/jsbsim/FlightProperties.cpp
+  src/flightgear/FlightGearSender.cpp
+  src/flightgear/FlightGearSystem.cpp
+  src/control/KeyboardInput.cpp
+  src/control/KeyboardInputSystem.cpp
+  src/control/ManualControlInputStrategy.cpp
+  src/gnc/RollHoldSystem.cpp
+)
+
+target_compile_features(
+  simulation_tests
+  PRIVATE
+  cxx_std_20
+)
+
+target_include_directories(
+  simulation_tests
+  PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(
+  simulation_tests
+  PRIVATE
+  libJSBSim
+  Eigen3::Eigen
+)
+
+if(WIN32)
+  target_link_libraries(
+    simulation_tests
+    PRIVATE
+    ws2_32
+  )
+endif()
+
+add_test(
+  NAME simulation_tests
+  COMMAND simulation_tests
 )
 
 target_include_directories(

@@ -1,5 +1,6 @@
 #include "control/KeyboardInput.hpp"
-#include <algorithm>
+
+#include "control/ControlInputStrategy.hpp"
 
 #ifdef _WIN32
 #include <conio.h>
@@ -9,15 +10,27 @@
 #endif
 
 namespace control {
-KeyboardInput::~KeyboardInput() {
+namespace {
+constexpr double InputStep = 0.05;
+} // namespace
+
+KeyboardInput::~KeyboardInput() { Shutdown(); }
+
+void KeyboardInput::Shutdown() {
 #ifndef _WIN32
   if (initialized_) {
     tcsetattr(STDIN_FILENO, TCSANOW, &originalTerminal_);
   }
 #endif
+
+  initialized_ = false;
 }
 
 bool KeyboardInput::Initialize() {
+  if (initialized_) {
+    return true;
+  }
+
 #ifdef _WIN32
   initialized_ = true;
   return true;
@@ -41,7 +54,7 @@ bool KeyboardInput::Initialize() {
 #endif
 }
 
-bool KeyboardInput::Update(ControlInput &input) {
+bool KeyboardInput::Update(ControlInputStrategy &strategy) {
   char key = '\0';
   bool changed = false;
 
@@ -53,46 +66,41 @@ bool KeyboardInput::Update(ControlInput &input) {
 #endif
     switch (key) {
     case 'w':
-      input.elevator -= 0.05;
-      changed = true;
+      changed = strategy.AdjustCommandedInput(ControlAxis::Elevator, -InputStep)
+                || changed;
       break;
     case 's':
-      input.elevator += 0.05;
-      changed = true;
+      changed = strategy.AdjustCommandedInput(ControlAxis::Elevator, InputStep)
+                || changed;
       break;
     case 'a':
-      input.aileron -= 0.05;
-      changed = true;
+      changed = strategy.AdjustCommandedInput(ControlAxis::Aileron, -InputStep)
+                || changed;
       break;
     case 'd':
-      input.aileron += 0.05;
-      changed = true;
+      changed = strategy.AdjustCommandedInput(ControlAxis::Aileron, InputStep)
+                || changed;
       break;
     case 'q':
-      input.rudder -= 0.05;
-      changed = true;
+      changed = strategy.AdjustCommandedInput(ControlAxis::Rudder, -InputStep)
+                || changed;
       break;
     case 'e':
-      input.rudder += 0.05;
-      changed = true;
+      changed = strategy.AdjustCommandedInput(ControlAxis::Rudder, InputStep)
+                || changed;
       break;
     case 'r':
-      input.throttle += 0.05;
-      changed = true;
+      changed = strategy.AdjustCommandedInput(ControlAxis::Throttle, InputStep)
+                || changed;
       break;
     case 'f':
-      input.throttle -= 0.05;
-      changed = true;
+      changed = strategy.AdjustCommandedInput(ControlAxis::Throttle, -InputStep)
+                || changed;
       break;
     default:
       break;
     }
   }
-
-  input.elevator = std::clamp(input.elevator, -1.0, 1.0);
-  input.aileron = std::clamp(input.aileron, -1.0, 1.0);
-  input.rudder = std::clamp(input.rudder, -1.0, 1.0);
-  input.throttle = std::clamp(input.throttle, 0.0, 1.0);
 
   return changed;
 }

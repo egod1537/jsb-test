@@ -31,6 +31,10 @@ public:
   PlotBuilder &SetYAxisLimits(double min, double max,
       ImPlotCond cond = ImPlotCond_Once);
   PlotBuilder &SetFlags(ImPlotFlags flags);
+  PlotBuilder &SetFixedView(bool enabled = true);
+  PlotBuilder &SetFocusedYAxis(bool enabled = true);
+  PlotBuilder &SetXAxisLimitsAlways(double min, double max);
+  PlotBuilder &SetYAxisLimitsAlways(double min, double max);
   PlotBuilder &SetLegendVisible(bool visible);
   PlotBuilder &SetOffset(int offset);
 
@@ -46,6 +50,10 @@ public:
   PlotBuilder &YAxisLimits(double min, double max,
       ImPlotCond cond = ImPlotCond_Once);
   PlotBuilder &Flags(ImPlotFlags flags);
+  PlotBuilder &FixedView(bool enabled = true);
+  PlotBuilder &FocusedYAxis(bool enabled = true);
+  PlotBuilder &XAxisLimitsAlways(double min, double max);
+  PlotBuilder &YAxisLimitsAlways(double min, double max);
   PlotBuilder &LegendVisible(bool visible);
   PlotBuilder &Offset(int offset);
 
