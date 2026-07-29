@@ -1,6 +1,6 @@
 #pragma once
 
-#include "simulation/SimulationConfig.h"
+#include "application/sim/SimulationConfig.h"
 
 #include <csignal>
 #include <memory>
@@ -15,6 +15,8 @@ class GUI;
 class Application {
 public:
   Application() = default;
+  ~Application();
+
   Application(std::unique_ptr<gui::GUI>, std::unique_ptr<sim::Simulation>,
       sim::SimulationConfig);
 
@@ -26,7 +28,7 @@ private:
   void UpdateGUI();
   void Exit();
 
-  std::unique_ptr<gui::GUI> gui_;
   std::unique_ptr<sim::Simulation> sim_;
+  std::unique_ptr<gui::GUI> gui_;
   sim::SimulationConfig simConfig_;
 };

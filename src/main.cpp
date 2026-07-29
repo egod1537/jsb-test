@@ -1,8 +1,8 @@
 #include "application/Application.hpp"
-#include "gui/GUI.hpp"
-#include "gui/GUIConfig.hpp"
-#include "simulation/Simulation.hpp"
-#include "simulation/SimulationConfig.h"
+#include "application/gui/GUI.hpp"
+#include "application/gui/GUIConfig.hpp"
+#include "application/sim/Simulation.hpp"
+#include "application/sim/SimulationConfig.h"
 
 #include <csignal>
 #include <memory>

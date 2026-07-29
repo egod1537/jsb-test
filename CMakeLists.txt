@@ -115,27 +115,42 @@ add_executable(
   jsb-flight-console
   src/main.cpp
   src/application/Application.cpp
-  src/simulation/Aircraft.cpp
-  src/simulation/Context.cpp
-  src/gnc/TrimSolver.cpp
-  src/gnc/RollHoldSystem.cpp
-  src/state/TrueStateProvider.cpp
-  src/gui/GUI.cpp
-  src/gui/Window.cpp
-  src/gui/windows/SimulationWindow.cpp
-  src/gui/windows/FlightConsoleWindow.cpp
-  src/gui/windows/monitor/FlightDataMonitorWindow.cpp
-  src/gui/windows/GNCWindow.cpp
-  src/gui/windows/samples/DeclarativeDemoWindow.cpp
-  src/gui/windows/samples/SamplePlotWindow.cpp
-  src/jsbsim/FlightControls.cpp
-  src/jsbsim/FlightProperties.cpp
-  src/flightgear/FlightGearSender.cpp
-  src/flightgear/FlightGearSystem.cpp
-  src/simulation/Simulation.cpp
-  src/control/KeyboardInput.cpp
-  src/control/KeyboardInputSystem.cpp
-  src/control/ManualControlInputStrategy.cpp
+  src/application/sim/Aircraft.cpp
+  src/application/sim/Context.cpp
+  src/application/sim/gnc/TrimSolver.cpp
+  src/application/sim/gnc/RollHoldSystem.cpp
+  src/application/sim/state/TrueStateProvider.cpp
+  src/application/gui/viz/core/Component.cpp
+  src/application/gui/viz/core/GameObject.cpp
+  src/application/gui/viz/core/Scene.cpp
+  src/application/gui/viz/render/CameraComponent.cpp
+  src/application/gui/viz/render/LineCanvas.cpp
+  src/application/gui/viz/components/GroundGridRenderer.cpp
+  src/application/gui/viz/components/AltitudeCueRenderer.cpp
+  src/application/gui/viz/components/FlightCameraController.cpp
+  src/application/gui/viz/components/AircraftWireframeRenderer.cpp
+  src/application/gui/viz/components/TelemetryOverlay.cpp
+  src/application/gui/viz/FlightVisualizer.cpp
+  src/application/gui/GUI.cpp
+  src/application/gui/Window.cpp
+  src/application/gui/panels/AutopilotPanel.cpp
+  src/application/gui/panels/ManualControlPanel.cpp
+  src/application/gui/panels/TrimPanel.cpp
+  src/application/gui/windows/SimulationWindow.cpp
+  src/application/gui/windows/FlightConsoleWindow.cpp
+  src/application/gui/windows/monitor/FlightDataMonitorWindow.cpp
+  src/application/gui/windows/viz/FlightVizWindow.cpp
+  src/application/gui/windows/GNCWindow.cpp
+  src/application/gui/windows/samples/DeclarativeDemoWindow.cpp
+  src/application/gui/windows/samples/SamplePlotWindow.cpp
+  src/application/sim/jsbsim/FlightControls.cpp
+  src/application/sim/jsbsim/FlightProperties.cpp
+  src/application/flightgear/FlightGearSender.cpp
+  src/application/flightgear/FlightGearSystem.cpp
+  src/application/sim/Simulation.cpp
+  src/application/sim/control/KeyboardInput.cpp
+  src/application/sim/control/KeyboardInputSystem.cpp
+  src/application/sim/control/ManualControlInputStrategy.cpp
 )
 
 target_compile_features(
@@ -187,18 +202,19 @@ add_test(
 add_executable(
   simulation_tests
   tests/SimulationTests.cpp
-  src/simulation/Simulation.cpp
-  src/simulation/Aircraft.cpp
-  src/simulation/Context.cpp
-  src/state/TrueStateProvider.cpp
-  src/jsbsim/FlightControls.cpp
-  src/jsbsim/FlightProperties.cpp
-  src/flightgear/FlightGearSender.cpp
-  src/flightgear/FlightGearSystem.cpp
-  src/control/KeyboardInput.cpp
-  src/control/KeyboardInputSystem.cpp
-  src/control/ManualControlInputStrategy.cpp
-  src/gnc/RollHoldSystem.cpp
+  src/application/sim/Simulation.cpp
+  src/application/sim/Aircraft.cpp
+  src/application/sim/Context.cpp
+  src/application/sim/state/TrueStateProvider.cpp
+  src/application/sim/jsbsim/FlightControls.cpp
+  src/application/sim/jsbsim/FlightProperties.cpp
+  src/application/flightgear/FlightGearSender.cpp
+  src/application/flightgear/FlightGearSystem.cpp
+  src/application/sim/control/KeyboardInput.cpp
+  src/application/sim/control/KeyboardInputSystem.cpp
+  src/application/sim/control/ManualControlInputStrategy.cpp
+  src/application/sim/gnc/TrimSolver.cpp
+  src/application/sim/gnc/RollHoldSystem.cpp
 )
 
 target_compile_features(

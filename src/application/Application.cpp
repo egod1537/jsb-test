@@ -1,6 +1,6 @@
 #include "Application.hpp"
-#include "gui/GUI.hpp"
-#include "simulation/Simulation.hpp"
+#include "application/gui/GUI.hpp"
+#include "application/sim/Simulation.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -20,8 +20,10 @@ Clock::duration ToClockDuration(double seconds) {
 
 Application::Application(std::unique_ptr<gui::GUI> gui,
     std::unique_ptr<sim::Simulation> sim, sim::SimulationConfig simConfig)
-    : gui_(std::move(gui)), sim_(std::move(sim)),
+    : sim_(std::move(sim)), gui_(std::move(gui)),
       simConfig_(std::move(simConfig)) {}
+
+Application::~Application() = default;
 
 bool Application::Run(const volatile std::sig_atomic_t &running) {
   if (!Start()) {

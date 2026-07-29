@@ -1,6 +1,6 @@
-#include "simulation/Aircraft.hpp"
-#include "simulation/Simulation.hpp"
-#include "state/IStateProvider.hpp"
+#include "application/sim/Aircraft.hpp"
+#include "application/sim/Simulation.hpp"
+#include "application/sim/state/IStateProvider.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -12,6 +12,7 @@ constexpr double SimTimeTolerance = 1.0e-9;
 constexpr double AltitudeToleranceFt = 1.0;
 constexpr double AirspeedToleranceKts = 0.5;
 constexpr double HeadingToleranceDeg = 0.5;
+constexpr double TrimInputTolerance = 1.0e-5;
 
 void Require(bool condition, const std::string &message) {
   if (!condition) {
@@ -236,6 +237,23 @@ void TestStateProvider() {
       "Aircraft state derivative uDot invalid");
 }
 
+void TestStartAppliesInitialTrim() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  const auto &aircraft = simulation.GetAircraft();
+  const control::ControlInput &input = aircraft.GetAircraftControlInput();
+  const double pitchTrim = aircraft.GetFlightControls().GetPitchTrim();
+
+  Require(input.throttle > TrimInputTolerance,
+      "Initial trim did not apply throttle command input");
+  Require(std::fabs(pitchTrim) > TrimInputTolerance,
+      "Initial trim did not apply pitch trim");
+  RequireNear(GetSimTime(simulation),
+      0.0,
+      SimTimeTolerance,
+      "Initial trim changed simulation time");
+}
+
 void TestManualControlInputStrategyAppliesCommands() {
   sim::Simulation simulation;
   StartSimulation(simulation);
@@ -312,6 +330,7 @@ int main() {
     TestEngineStateInspection();
     TestInvalidInitialConditionFails();
     TestStateProvider();
+    TestStartAppliesInitialTrim();
     TestManualControlInputStrategyAppliesCommands();
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
