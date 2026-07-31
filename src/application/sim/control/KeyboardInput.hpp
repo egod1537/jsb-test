@@ -5,7 +5,7 @@
 #endif
 
 namespace control {
-class ControlInputStrategy;
+class ManualFlightControlController;
 
 class KeyboardInput {
 public:
@@ -17,7 +17,7 @@ public:
 
   bool Initialize();
   void Shutdown();
-  bool Update(ControlInputStrategy &strategy);
+  bool Update(ManualFlightControlController &manualController);
 
 private:
 #ifndef _WIN32

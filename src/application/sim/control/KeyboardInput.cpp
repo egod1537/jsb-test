@@ -1,6 +1,6 @@
 #include "application/sim/control/KeyboardInput.hpp"
 
-#include "application/sim/control/ControlInputStrategy.hpp"
+#include "application/sim/control/ManualFlightControlController.hpp"
 
 #ifdef _WIN32
 #include <conio.h>
@@ -54,7 +54,7 @@ bool KeyboardInput::Initialize() {
 #endif
 }
 
-bool KeyboardInput::Update(ControlInputStrategy &strategy) {
+bool KeyboardInput::Update(ManualFlightControlController &manualController) {
   char key = '\0';
   bool changed = false;
 
@@ -66,36 +66,52 @@ bool KeyboardInput::Update(ControlInputStrategy &strategy) {
 #endif
     switch (key) {
     case 'w':
-      changed = strategy.AdjustCommandedInput(ControlAxis::Elevator, -InputStep)
-                || changed;
+      changed =
+          manualController.AdjustCommandedInput(ControlAxis::Elevator,
+              -InputStep)
+          || changed;
       break;
     case 's':
-      changed = strategy.AdjustCommandedInput(ControlAxis::Elevator, InputStep)
-                || changed;
+      changed =
+          manualController.AdjustCommandedInput(ControlAxis::Elevator,
+              InputStep)
+          || changed;
       break;
     case 'a':
-      changed = strategy.AdjustCommandedInput(ControlAxis::Aileron, -InputStep)
-                || changed;
+      changed =
+          manualController.AdjustCommandedInput(ControlAxis::Aileron,
+              -InputStep)
+          || changed;
       break;
     case 'd':
-      changed = strategy.AdjustCommandedInput(ControlAxis::Aileron, InputStep)
-                || changed;
+      changed =
+          manualController.AdjustCommandedInput(ControlAxis::Aileron,
+              InputStep)
+          || changed;
       break;
     case 'q':
-      changed = strategy.AdjustCommandedInput(ControlAxis::Rudder, -InputStep)
-                || changed;
+      changed =
+          manualController.AdjustCommandedInput(ControlAxis::Rudder,
+              -InputStep)
+          || changed;
       break;
     case 'e':
-      changed = strategy.AdjustCommandedInput(ControlAxis::Rudder, InputStep)
-                || changed;
+      changed =
+          manualController.AdjustCommandedInput(ControlAxis::Rudder,
+              InputStep)
+          || changed;
       break;
     case 'r':
-      changed = strategy.AdjustCommandedInput(ControlAxis::Throttle, InputStep)
-                || changed;
+      changed =
+          manualController.AdjustCommandedInput(ControlAxis::Throttle,
+              InputStep)
+          || changed;
       break;
     case 'f':
-      changed = strategy.AdjustCommandedInput(ControlAxis::Throttle, -InputStep)
-                || changed;
+      changed =
+          manualController.AdjustCommandedInput(ControlAxis::Throttle,
+              -InputStep)
+          || changed;
       break;
     default:
       break;

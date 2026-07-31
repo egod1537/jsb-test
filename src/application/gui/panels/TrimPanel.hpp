@@ -6,8 +6,8 @@
 namespace gui {
 struct TrimPanelProps {
   gnc::TrimRequest &request;
-  gnc::TrimResult &result;
-  bool &hasResult;
+  const gnc::TrimResult &result;
+  bool hasResult;
   bool &resultOpen;
   bool &residualOpen;
   bool canRequestTrim;

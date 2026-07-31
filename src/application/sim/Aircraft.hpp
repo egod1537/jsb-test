@@ -1,7 +1,6 @@
 #pragma once
 
 #include "application/sim/control/ControlInput.hpp"
-#include "application/sim/control/ControlInputStrategy.hpp"
 #include "application/sim/jsbsim/FlightControls.hpp"
 #include "application/sim/jsbsim/FlightProperties.hpp"
 #include "application/sim/AircraftState.hpp"
@@ -51,21 +50,12 @@ public:
 
   const control::ControlInput &GetAircraftControlInput() const;
   void SetAircraftControlInput(const control::ControlInput &input);
-
-  const control::ControlInput &GetControlInput() const;
-  control::ControlInputStrategy &GetControlInputStrategy();
-  const control::ControlInputStrategy &GetControlInputStrategy() const;
-  void SetControlInputStrategy(
-      std::unique_ptr<control::ControlInputStrategy> strategy);
-  void UseManualControlInputStrategy();
-
-  bool SetControlInputCommand(const control::ControlInput &input);
-  bool SetControlInputCommand(control::ControlAxis axis, double value);
-  bool AdjustControlInputCommand(control::ControlAxis axis, double delta);
   bool SetElevatorInput(double value);
   bool SetAileronInput(double value);
   bool SetRudderInput(double value);
   bool SetThrottleInput(double value);
+
+  const control::ControlInput &GetControlInput() const;
 
   std::size_t GetEngineCount() const;
   EngineState GetEngineState(std::size_t index) const;
@@ -79,14 +69,11 @@ private:
   void ConfigureSimulation(const SimulationConfig &config);
   void ConfigureInitialConditions(const SimulationConfig &config);
   bool InitializeState();
-  bool UpdateControlInput();
   void ApplyControlInput();
 
   std::unique_ptr<JSBSim::FGFDMExec> fdm_;
   JSBSim::FlightProperties properties_;
   JSBSim::FlightControls flightControls_;
-  std::unique_ptr<control::ControlInputStrategy> controlInputStrategy_;
   control::ControlInput controlInput_;
-  double controlDt_ = 0.0;
 };
 } // namespace sim

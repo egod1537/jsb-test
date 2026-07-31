@@ -1,7 +1,5 @@
 #include "application/sim/Aircraft.hpp"
 
-#include "application/sim/control/ManualControlInputStrategy.hpp"
-
 #include <FGFDMExec.h>
 #include <algorithm>
 #include <cmath>
@@ -66,15 +64,12 @@ std::string ResolveJSBSimRootPath() {
 namespace sim {
 Aircraft::Aircraft()
     : fdm_(std::make_unique<JSBSim::FGFDMExec>()), properties_(*fdm_),
-      flightControls_(*fdm_),
-      controlInputStrategy_(
-          std::make_unique<control::ManualControlInputStrategy>()) {}
+      flightControls_(*fdm_) {}
 
 Aircraft::~Aircraft() = default;
 
 bool Aircraft::Initialize(const SimulationConfig &config) {
   controlInput_ = {};
-  controlInputStrategy_->Reset();
 
   ConfigurePaths();
   if (!LoadAircraft(config)) {
@@ -87,7 +82,6 @@ bool Aircraft::Initialize(const SimulationConfig &config) {
 }
 
 bool Aircraft::Step() {
-  UpdateControlInput();
   ApplyControlInput();
   return fdm_->Run();
 }
@@ -96,32 +90,32 @@ bool Aircraft::Update() { return Step(); }
 
 AircraftState Aircraft::GetAircraftState() const {
   AircraftState state{};
-  state.simulationTimeSec = properties_.GetSimTimeSec();
-  state.altitudeAglFt = properties_.GetAltitudeAglFt();
-  state.calibratedAirspeedKts = properties_.GetCalibratedAirspeedKts();
-  state.trueAirspeedMps = properties_.GetTrueAirspeedMps();
-  state.rollDeg = properties_.GetRollDeg();
-  state.pitchDeg = properties_.GetPitchDeg();
+  state.simulationTimeSec = properties_.SimTime().Sec();
+  state.altitudeAglFt = properties_.AltitudeAgl().Ft();
+  state.calibratedAirspeedKts = properties_.CalibratedAirspeed().Kts();
+  state.trueAirspeedMps = properties_.TrueAirspeed().Mps();
+  state.rollDeg = properties_.Roll().Deg();
+  state.pitchDeg = properties_.Pitch().Deg();
   state.headingDeg = RadToDegValue(properties_.Get(CurrentHeadingRad));
-  state.alphaDeg = properties_.GetAlphaDeg();
-  state.betaDeg = properties_.GetBetaDeg();
-  state.uMps = properties_.GetUMps();
-  state.vMps = properties_.GetVMps();
-  state.wMps = properties_.GetWMps();
-  state.pDegPerSec = properties_.GetPDegPerSec();
-  state.qDegPerSec = properties_.GetQDegPerSec();
-  state.rDegPerSec = properties_.GetRDegPerSec();
+  state.alphaDeg = properties_.Alpha().Deg();
+  state.betaDeg = properties_.Beta().Deg();
+  state.uMps = properties_.U().Mps();
+  state.vMps = properties_.V().Mps();
+  state.wMps = properties_.W().Mps();
+  state.pDegPerSec = properties_.P().DegPerSec();
+  state.qDegPerSec = properties_.Q().DegPerSec();
+  state.rDegPerSec = properties_.R().DegPerSec();
   return state;
 }
 
 AircraftStateDerivative Aircraft::GetAircraftStateDerivative() const {
   AircraftStateDerivative derivative{};
-  derivative.uDotMps2 = properties_.GetUDotMps2();
-  derivative.vDotMps2 = properties_.GetVDotMps2();
-  derivative.wDotMps2 = properties_.GetWDotMps2();
-  derivative.pDotDegPerSec2 = properties_.GetPdotDegPerSec2();
-  derivative.qDotDegPerSec2 = properties_.GetQdotDegPerSec2();
-  derivative.rDotDegPerSec2 = properties_.GetRdotDegPerSec2();
+  derivative.uDotMps2 = properties_.U().DotMps2();
+  derivative.vDotMps2 = properties_.V().DotMps2();
+  derivative.wDotMps2 = properties_.W().DotMps2();
+  derivative.pDotDegPerSec2 = properties_.P().DotDegPerSec2();
+  derivative.qDotDegPerSec2 = properties_.Q().DotDegPerSec2();
+  derivative.rDotDegPerSec2 = properties_.R().DotDegPerSec2();
   return derivative;
 }
 
@@ -164,7 +158,7 @@ InitialCondition Aircraft::CaptureCurrentCondition() const {
   initialCondition.pitchDeg = RadToDegValue(properties_.Get(CurrentPitchRad));
   initialCondition.headingDeg =
       RadToDegValue(properties_.Get(CurrentHeadingRad));
-  initialCondition.airspeedKts = properties_.GetCalibratedAirspeedKts();
+  initialCondition.airspeedKts = properties_.CalibratedAirspeed().Kts();
   initialCondition.pRadPerSec = properties_.Get(CurrentPRadPerSec);
   initialCondition.qRadPerSec = properties_.Get(CurrentQRadPerSec);
   initialCondition.rRadPerSec = properties_.Get(CurrentRRadPerSec);
@@ -210,81 +204,40 @@ const control::ControlInput &Aircraft::GetAircraftControlInput() const {
 }
 
 void Aircraft::SetAircraftControlInput(const control::ControlInput &input) {
-  SetControlInputCommand(input);
-  controlInput_ = controlInputStrategy_->GetCommandedInput();
+  controlInput_ = input;
   control::ClampControlInput(controlInput_);
-  ApplyControlInput();
+}
+
+bool Aircraft::SetElevatorInput(double value) {
+  return control::SetControlAxisValue(controlInput_,
+      control::ControlAxis::Elevator,
+      value);
+}
+
+bool Aircraft::SetAileronInput(double value) {
+  return control::SetControlAxisValue(controlInput_,
+      control::ControlAxis::Aileron,
+      value);
+}
+
+bool Aircraft::SetRudderInput(double value) {
+  return control::SetControlAxisValue(controlInput_,
+      control::ControlAxis::Rudder,
+      value);
+}
+
+bool Aircraft::SetThrottleInput(double value) {
+  return control::SetControlAxisValue(controlInput_,
+      control::ControlAxis::Throttle,
+      value);
 }
 
 const control::ControlInput &Aircraft::GetControlInput() const {
   return GetAircraftControlInput();
 }
 
-control::ControlInputStrategy &Aircraft::GetControlInputStrategy() {
-  return *controlInputStrategy_;
-}
-
-const control::ControlInputStrategy &Aircraft::GetControlInputStrategy() const {
-  return *controlInputStrategy_;
-}
-
-void Aircraft::SetControlInputStrategy(
-    std::unique_ptr<control::ControlInputStrategy> strategy) {
-  if (strategy == nullptr) {
-    return;
-  }
-
-  const control::ControlInput previousInput =
-      controlInputStrategy_ != nullptr
-          ? controlInputStrategy_->GetCommandedInput()
-          : controlInput_;
-  controlInputStrategy_ = std::move(strategy);
-  SetControlInputCommand(previousInput);
-}
-
-bool Aircraft::SetControlInputCommand(const control::ControlInput &input) {
-  bool changed = false;
-  changed =
-      SetControlInputCommand(control::ControlAxis::Elevator, input.elevator)
-      || changed;
-  changed = SetControlInputCommand(control::ControlAxis::Aileron, input.aileron)
-            || changed;
-  changed = SetControlInputCommand(control::ControlAxis::Rudder, input.rudder)
-            || changed;
-  changed =
-      SetControlInputCommand(control::ControlAxis::Throttle, input.throttle)
-      || changed;
-  return changed;
-}
-
-bool Aircraft::SetControlInputCommand(control::ControlAxis axis, double value) {
-  return controlInputStrategy_->SetCommandedInput(axis, value);
-}
-
-bool Aircraft::AdjustControlInputCommand(control::ControlAxis axis,
-    double delta) {
-  return controlInputStrategy_->AdjustCommandedInput(axis, delta);
-}
-
-bool Aircraft::SetElevatorInput(double value) {
-  return SetControlInputCommand(control::ControlAxis::Elevator, value);
-}
-
-bool Aircraft::SetAileronInput(double value) {
-  return SetControlInputCommand(control::ControlAxis::Aileron, value);
-}
-
-bool Aircraft::SetRudderInput(double value) {
-  return SetControlInputCommand(control::ControlAxis::Rudder, value);
-}
-
-bool Aircraft::SetThrottleInput(double value) {
-  return SetControlInputCommand(control::ControlAxis::Throttle, value);
-}
-
 void Aircraft::ResetControlInput() {
   controlInput_ = {};
-  controlInputStrategy_->Reset();
 
   flightControls_.SetPitchTrim(0.0);
   ApplyControlInput();
@@ -371,7 +324,6 @@ bool Aircraft::LoadAircraft(const SimulationConfig &config) {
 }
 
 void Aircraft::ConfigureSimulation(const SimulationConfig &config) {
-  controlDt_ = config.GetDT();
   fdm_->Setdt(config.GetDT());
 }
 
@@ -392,21 +344,9 @@ bool Aircraft::InitializeState() {
     return false;
   }
 
-  std::cout << "Initial altitude: " << properties_.GetAltitudeAglFt()
+  std::cout << "Initial altitude: " << properties_.AltitudeAgl().Ft()
             << " ft\n";
   return true;
-}
-
-void Aircraft::UseManualControlInputStrategy() {
-  SetControlInputStrategy(
-      std::make_unique<control::ManualControlInputStrategy>());
-}
-
-bool Aircraft::UpdateControlInput() {
-  const bool changed =
-      controlInputStrategy_->Update(*this, controlDt_, controlInput_);
-  control::ClampControlInput(controlInput_);
-  return changed;
 }
 
 void Aircraft::ApplyControlInput() {

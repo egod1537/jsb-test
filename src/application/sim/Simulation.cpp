@@ -1,6 +1,5 @@
 #include "application/sim/Simulation.hpp"
 #include "application/sim/Context.hpp"
-#include "application/sim/gnc/TrimSolver.hpp"
 #include "application/sim/SimulationConfig.h"
 #include "application/sim/state/TrueStateProvider.hpp"
 #include <FGFDMExec.h>
@@ -40,6 +39,17 @@ gnc::TrimRequest TrimRequestFromInitialCondition(
   request.flightPathAngleDeg = 0.0;
   return request;
 }
+
+void SetManualControlFromTrimResult(
+    control::ManualFlightControlController &manualController,
+    const gnc::TrimResult &trimResult) {
+  manualController.SetCommandedInput({
+      .elevator = trimResult.elevator,
+      .aileron = trimResult.aileron,
+      .rudder = trimResult.rudder,
+      .throttle = trimResult.throttle,
+  });
+}
 } // namespace
 
 namespace sim {
@@ -58,7 +68,9 @@ const char *ToString(SimulationState state) {
 
 // public
 Simulation::Simulation()
-    : stateProvider_(std::make_unique<state::TrueStateProvider>(aircraft_)) {
+    : stateProvider_(std::make_unique<state::TrueStateProvider>(aircraft_)),
+      autopilotControlController_(autopilot_, manualControlController_) {
+  keyboard_.SetManualFlightControlController(manualControlController_);
   RegisterSystems();
 }
 
@@ -76,6 +88,9 @@ bool Simulation::Start(const SimulationConfig &config) {
   pendingSteps_ = 0;
   tickIndex_ = 0;
   lastError_.reset();
+  flightControlMode_ = control::FlightControlMode::Manual;
+  manualControlController_.Reset();
+  autopilotControlController_.Reset();
 
   if (!aircraft_.Initialize(config_)) {
     SetError("Failed to initialize aircraft.");
@@ -217,6 +232,10 @@ bool Simulation::Restart(const InitialCondition &initialCondition) {
     return false;
   }
 
+  flightControlMode_ = control::FlightControlMode::Manual;
+  manualControlController_.Reset();
+  autopilotControlController_.Reset();
+
   if (!ApplyInitialTrim(initialCondition_)) {
     state_ = SimulationState::Paused;
     return false;
@@ -247,6 +266,30 @@ Aircraft &Simulation::GetAircraft() { return aircraft_; }
 
 const Aircraft &Simulation::GetAircraft() const { return aircraft_; }
 
+control::FlightControlMode Simulation::GetFlightControlMode() const {
+  return flightControlMode_;
+}
+
+void Simulation::SetFlightControlMode(control::FlightControlMode mode) {
+  flightControlMode_ = mode;
+}
+
+control::ManualFlightControlController &
+Simulation::GetManualFlightControlController() {
+  return manualControlController_;
+}
+
+const control::ManualFlightControlController &
+Simulation::GetManualFlightControlController() const {
+  return manualControlController_;
+}
+
+gnc::Autopilot &Simulation::GetAutopilot() { return autopilot_; }
+
+const gnc::Autopilot &Simulation::GetAutopilot() const {
+  return autopilot_;
+}
+
 const state::IStateProvider &Simulation::GetStateProvider() const {
   return *stateProvider_;
 }
@@ -259,6 +302,15 @@ bool Simulation::AdvanceOneTick() {
     }
     return false;
   }
+
+  control::FlightControlController *flightControlController =
+      &manualControlController_;
+  if (flightControlMode_ == control::FlightControlMode::Autopilot) {
+    flightControlController = &autopilotControlController_;
+  }
+
+  aircraft_.SetAircraftControlInput(
+      flightControlController->Update(aircraft_, preStepTick.dtSec));
 
   if (!aircraft_.Step()) {
     SetError("JSBSim simulation stopped.");
@@ -399,21 +451,26 @@ void Simulation::ShutdownSystems() {
 void Simulation::RegisterSystems() {
   systems_.clear();
   systems_.push_back(&keyboard_);
-  systems_.push_back(&rollHold_);
+  systems_.push_back(&autopilot_);
   systems_.push_back(&flightGear_);
 }
 
 bool Simulation::ApplyInitialTrim(const InitialCondition &initialCondition) {
-  gnc::TrimSolver trimSolver;
-  const gnc::TrimResult trimResult =
-      trimSolver.Trim(aircraft_,
-          TrimRequestFromInitialCondition(initialCondition));
-
-  if (!trimResult.success) {
-    SetError(trimResult.message.empty() ? "Initial trim failed."
-                                        : trimResult.message);
+  if (!autopilot_.ComputeTrim(aircraft_,
+          TrimRequestFromInitialCondition(initialCondition))) {
+    SetError("Initial trim failed.");
     std::cerr << "Initial trim failed: " << *lastError_ << '\n';
     return false;
+  }
+
+  if (!autopilot_.ApplyStoredTrim(aircraft_)) {
+    SetError("Failed to apply stored initial trim.");
+    std::cerr << *lastError_ << '\n';
+    return false;
+  }
+
+  if (const gnc::TrimResult *trimResult = autopilot_.GetTrimResult()) {
+    SetManualControlFromTrimResult(manualControlController_, *trimResult);
   }
 
   aircraft_.GetFDMExec().Setsim_time(0.0);

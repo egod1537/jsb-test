@@ -2,6 +2,10 @@
 
 #include "application/gui/panels/AutopilotPanel.hpp"
 
+namespace control {
+class ManualFlightControlController;
+}
+
 namespace sim {
 class Aircraft;
 }
@@ -9,7 +13,8 @@ class Aircraft;
 namespace gui {
 class ManualControlPanel {
 public:
-  static void Draw(sim::Aircraft &aircraft,
+  static void Draw(control::ManualFlightControlController &manualController,
+      const sim::Aircraft &aircraft,
       const AutopilotPanelState &autopilotState);
 };
 } // namespace gui

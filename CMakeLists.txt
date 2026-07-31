@@ -117,8 +117,15 @@ add_executable(
   src/application/Application.cpp
   src/application/sim/Aircraft.cpp
   src/application/sim/Context.cpp
+  src/application/sim/control/ManualFlightControlController.cpp
+  src/application/sim/control/AutopilotFlightControlController.cpp
   src/application/sim/gnc/TrimSolver.cpp
-  src/application/sim/gnc/RollHoldSystem.cpp
+  src/application/sim/gnc/Autopilot.cpp
+  src/application/sim/gnc/hold/RollHoldController.cpp
+  src/application/sim/gnc/hold/PitchHoldController.cpp
+  src/application/sim/gnc/hold/AirspeedHoldController.cpp
+  src/application/sim/gnc/hold/CourseHoldController.cpp
+  src/application/sim/gnc/hold/AltitudeHoldController.cpp
   src/application/sim/state/TrueStateProvider.cpp
   src/application/gui/viz/core/Component.cpp
   src/application/gui/viz/core/GameObject.cpp
@@ -150,7 +157,6 @@ add_executable(
   src/application/sim/Simulation.cpp
   src/application/sim/control/KeyboardInput.cpp
   src/application/sim/control/KeyboardInputSystem.cpp
-  src/application/sim/control/ManualControlInputStrategy.cpp
 )
 
 target_compile_features(
@@ -212,9 +218,15 @@ add_executable(
   src/application/flightgear/FlightGearSystem.cpp
   src/application/sim/control/KeyboardInput.cpp
   src/application/sim/control/KeyboardInputSystem.cpp
-  src/application/sim/control/ManualControlInputStrategy.cpp
+  src/application/sim/control/ManualFlightControlController.cpp
+  src/application/sim/control/AutopilotFlightControlController.cpp
   src/application/sim/gnc/TrimSolver.cpp
-  src/application/sim/gnc/RollHoldSystem.cpp
+  src/application/sim/gnc/Autopilot.cpp
+  src/application/sim/gnc/hold/RollHoldController.cpp
+  src/application/sim/gnc/hold/PitchHoldController.cpp
+  src/application/sim/gnc/hold/AirspeedHoldController.cpp
+  src/application/sim/gnc/hold/CourseHoldController.cpp
+  src/application/sim/gnc/hold/AltitudeHoldController.cpp
 )
 
 target_compile_features(

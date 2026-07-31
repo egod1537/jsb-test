@@ -1,13 +1,17 @@
 #include "application/sim/control/KeyboardInputSystem.hpp"
 
-#include "application/sim/control/ControlInputStrategy.hpp"
-#include "application/sim/Aircraft.hpp"
+#include "application/sim/control/ManualFlightControlController.hpp"
 #include "application/sim/Context.hpp"
 #include "application/sim/Tick.hpp"
 
 #include <iostream>
 
 namespace control {
+void KeyboardInputSystem::SetManualFlightControlController(
+    ManualFlightControlController &manualController) {
+  manualController_ = &manualController;
+}
+
 bool KeyboardInputSystem::Initialize(sim::Context &context) {
   if (!keyboardInput_.Initialize()) {
     context.SetError("Failed to initialize keyboard input.");
@@ -19,10 +23,13 @@ bool KeyboardInputSystem::Initialize(sim::Context &context) {
 }
 
 bool KeyboardInputSystem::PreStep(sim::Context &context, const sim::Tick &) {
-  ControlInputStrategy &strategy =
-      context.GetAircraft().GetControlInputStrategy();
-  if (keyboardInput_.Update(strategy)) {
-    const ControlInput &controlInput = strategy.GetCommandedInput();
+  if (manualController_ == nullptr) {
+    context.SetError("Keyboard input has no manual flight control controller.");
+    return false;
+  }
+
+  if (keyboardInput_.Update(*manualController_)) {
+    const ControlInput &controlInput = manualController_->GetCommandedInput();
     std::cout << "control"
               << " elevator=" << controlInput.elevator
               << " aileron=" << controlInput.aileron

@@ -6,12 +6,41 @@
 #include "application/gui/panels/TrimPanel.hpp"
 #include "application/sim/Aircraft.hpp"
 #include "application/sim/Simulation.hpp"
+#include "application/sim/control/FlightControlMode.hpp"
+#include "application/sim/gnc/Autopilot.hpp"
 #include "flightui/FlightUI.hpp"
 
 #include <iostream>
 
 namespace gui {
 namespace UI = FlightUI;
+
+namespace {
+constexpr double DegToRad = 0.017453292519943295769;
+
+gnc::RollHoldSettings MakeRollHoldSettings(
+    const AutopilotPanelState &state) {
+  return {
+      .targetRollRad = state.rollTargetDeg * DegToRad,
+      .proportionalGain = state.rollHoldKp,
+      .derivativeGain = state.rollHoldKd,
+  };
+}
+
+gnc::PitchHoldSettings MakePitchHoldSettings(
+    const AutopilotPanelState &state) {
+  return {
+      .targetPitchRad = state.pitchTargetDeg * DegToRad,
+      .proportionalGain = state.pitchHoldKp,
+      .derivativeGain = state.pitchHoldKd,
+  };
+}
+
+bool HasAnyAutopilotHoldEnabled(const AutopilotPanelState &state) {
+  return state.rollHold || state.pitchHold || state.yawHold
+         || state.altitudeHold || state.courseHold;
+}
+} // namespace
 
 GNCWindow::GNCWindow() : Window("GNC") {}
 
@@ -53,13 +82,26 @@ void GNCWindow::ExecutePendingTrim(sim::Simulation &simulation) {
   std::cout << "[GNC] trim request command=" << commandLabel
             << " simTime=" << simTime << '\n';
 
+  auto &autopilot = simulation.GetAutopilot();
+  bool trimSuccess = false;
   if (command == PendingTrimCommand::RunInitialCondition) {
-    trimResult_ = trimSolver_.Trim(aircraft, trimRequest_);
+    trimSuccess = autopilot.ComputeTrim(aircraft, trimRequest_);
   } else if (command == PendingTrimCommand::CurrentState) {
-    trimResult_ = trimSolver_.TrimCurrentState(aircraft, trimRequest_.mode);
+    trimSuccess =
+        autopilot.ComputeCurrentStateTrim(aircraft, trimRequest_.mode);
   }
 
-  trimHasResult_ = true;
+  if (trimSuccess && autopilot.ApplyStoredTrim(aircraft)) {
+    if (const gnc::TrimResult *trimResult = autopilot.GetTrimResult()) {
+      simulation.GetManualFlightControlController().SetCommandedInput({
+          .elevator = trimResult->elevator,
+          .aileron = trimResult->aileron,
+          .rudder = trimResult->rudder,
+          .throttle = trimResult->throttle,
+      });
+    }
+  }
+
   trimResultOpen_ = true;
   trimResidualOpen_ = true;
   trimInProgress_ = false;
@@ -72,6 +114,11 @@ void GNCWindow::ExecutePendingTrim(sim::Simulation &simulation) {
 void GNCWindow::OnUpdate(gui::GUI &gui) {
   auto &simulation = gui.GetSimulation();
   auto &aircraft = simulation.GetAircraft();
+  auto &manualController = simulation.GetManualFlightControlController();
+  const gnc::TrimResult emptyTrimResult{};
+  const gnc::TrimResult *trimResult =
+      simulation.GetAutopilot().GetTrimResult();
+  const bool trimHasResult = trimResult != nullptr;
 
   // clang-format off
   UI::VerticalLayout()
@@ -80,11 +127,14 @@ void GNCWindow::OnUpdate(gui::GUI &gui) {
             [
               +UI::Tab("Trim")
                   [
-                    UI::Custom([this] {
+                    UI::Custom([this,
+                                   emptyTrimResult,
+                                   trimResult,
+                                   trimHasResult] {
                       TrimPanel::Draw({
                           trimRequest_,
-                          trimResult_,
-                          trimHasResult_,
+                          trimHasResult ? *trimResult : emptyTrimResult,
+                          trimHasResult,
                           trimResultOpen_,
                           trimResidualOpen_,
                           !trimInProgress_
@@ -100,15 +150,46 @@ void GNCWindow::OnUpdate(gui::GUI &gui) {
                   ]
               + UI::Tab("Autopilot")
                     [
-                      UI::Custom([this] {
-                        AutopilotPanel::Draw(autopilotPanelState_);
+                      UI::Custom([this, &simulation, &aircraft] {
+                        const auto &properties = aircraft.GetProperties();
+                        AutopilotPanel::Draw({
+                            .state = autopilotPanelState_,
+                            .currentRollDeg = properties.Roll().Deg(),
+                            .currentRollRateDegPerSec =
+                                properties.P().DegPerSec(),
+                            .currentAileron =
+                                aircraft.GetAircraftControlInput().aileron,
+                            .rollHoldActive =
+                                simulation.GetFlightControlMode()
+                                    == control::FlightControlMode::Autopilot
+                                && simulation.GetAutopilot()
+                                       .IsRollHoldEnabled(),
+                            .captureCurrentRoll = [this, &properties] {
+                              autopilotPanelState_.rollTargetDeg =
+                                  properties.Roll().Deg();
+                            },
+                            .currentPitchDeg = properties.Pitch().Deg(),
+                            .currentPitchRateDegPerSec =
+                                properties.Q().DegPerSec(),
+                            .currentElevator =
+                                aircraft.GetAircraftControlInput().elevator,
+                            .pitchHoldActive =
+                                simulation.GetFlightControlMode()
+                                    == control::FlightControlMode::Autopilot
+                                && simulation.GetAutopilot()
+                                       .IsPitchHoldEnabled(),
+                            .captureCurrentPitch = [this, &properties] {
+                              autopilotPanelState_.pitchTargetDeg =
+                                  properties.Pitch().Deg();
+                            },
+                        });
                       })
                     ]
               + UI::Tab("Flight Control")
                     [
-                      UI::Custom([&aircraft, this] {
+                      UI::Custom([&manualController, &aircraft, this] {
                         ManualControlPanel::Draw(
-                            aircraft, autopilotPanelState_);
+                            manualController, aircraft, autopilotPanelState_);
                       })
                     ]
             ]
@@ -116,6 +197,15 @@ void GNCWindow::OnUpdate(gui::GUI &gui) {
       .Render();
   // clang-format on
 
+  auto &autopilot = simulation.GetAutopilot();
+  autopilot.SetRollHoldEnabled(autopilotPanelState_.rollHold);
+  autopilot.SetRollHoldSettings(MakeRollHoldSettings(autopilotPanelState_));
+  autopilot.SetPitchHoldEnabled(autopilotPanelState_.pitchHold);
+  autopilot.SetPitchHoldSettings(MakePitchHoldSettings(autopilotPanelState_));
+  simulation.SetFlightControlMode(
+      HasAnyAutopilotHoldEnabled(autopilotPanelState_)
+          ? control::FlightControlMode::Autopilot
+          : control::FlightControlMode::Manual);
   ExecutePendingTrim(simulation);
 }
 } // namespace gui

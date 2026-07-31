@@ -2,7 +2,7 @@
 
 #include "application/sim/Aircraft.hpp"
 #include "application/sim/control/ControlInput.hpp"
-#include "application/sim/control/ControlInputStrategy.hpp"
+#include "application/sim/control/ManualFlightControlController.hpp"
 #include "flightui/FlightUI.hpp"
 
 namespace gui {
@@ -68,83 +68,85 @@ const char *ManualControlLockTooltip(const AutopilotPanelState &autopilotState,
   return "";
 }
 
-void AdjustManualInput(control::ControlInputStrategy &strategy,
+void AdjustManualInput(control::ManualFlightControlController &manualController,
     const AutopilotPanelState &autopilotState, control::ControlAxis axis,
     double delta) {
   if (!IsManualControlAllowed(autopilotState, axis)) {
     return;
   }
 
-  strategy.AdjustCommandedInput(axis, delta);
+  manualController.AdjustCommandedInput(axis, delta);
 }
 
-void SetManualInput(control::ControlInputStrategy &strategy,
+void SetManualInput(control::ManualFlightControlController &manualController,
     const AutopilotPanelState &autopilotState, control::ControlAxis axis,
     double value) {
   if (!IsManualControlAllowed(autopilotState, axis)) {
     return;
   }
 
-  strategy.SetCommandedInput(axis, value);
+  manualController.SetCommandedInput(axis, value);
 }
 
-void ApplyManualInputShortcuts(control::ControlInputStrategy &strategy,
+void ApplyManualInputShortcuts(
+    control::ManualFlightControlController &manualController,
     const AutopilotPanelState &autopilotState) {
   if (!CanApplyManualInputShortcuts()) {
     return;
   }
 
   if (WasShortcutPressed(UI::Key::F)) {
-    AdjustManualInput(strategy,
+    AdjustManualInput(manualController,
         autopilotState,
         control::ControlAxis::Throttle,
         -ManualInputStep);
   }
   if (WasShortcutPressed(UI::Key::R)) {
-    AdjustManualInput(strategy,
+    AdjustManualInput(manualController,
         autopilotState,
         control::ControlAxis::Throttle,
         ManualInputStep);
   }
   if (WasShortcutPressed(UI::Key::W)) {
-    AdjustManualInput(strategy,
+    AdjustManualInput(manualController,
         autopilotState,
         control::ControlAxis::Elevator,
         -ManualInputStep);
   }
   if (WasShortcutPressed(UI::Key::S)) {
-    AdjustManualInput(strategy,
+    AdjustManualInput(manualController,
         autopilotState,
         control::ControlAxis::Elevator,
         ManualInputStep);
   }
   if (WasShortcutPressed(UI::Key::A)) {
-    AdjustManualInput(strategy,
+    AdjustManualInput(manualController,
         autopilotState,
         control::ControlAxis::Aileron,
         -ManualInputStep);
   }
   if (WasShortcutPressed(UI::Key::D)) {
-    AdjustManualInput(strategy,
+    AdjustManualInput(manualController,
         autopilotState,
         control::ControlAxis::Aileron,
         ManualInputStep);
   }
   if (WasShortcutPressed(UI::Key::Q)) {
-    AdjustManualInput(strategy,
+    AdjustManualInput(manualController,
         autopilotState,
         control::ControlAxis::Rudder,
         -ManualInputStep);
   }
   if (WasShortcutPressed(UI::Key::E)) {
-    AdjustManualInput(strategy,
+    AdjustManualInput(manualController,
         autopilotState,
         control::ControlAxis::Rudder,
         ManualInputStep);
   }
 }
 
-UI::UIElement MakeThrottleRow(control::ControlInputStrategy &strategy,
+UI::UIElement MakeThrottleRow(
+    control::ManualFlightControlController &manualController,
     const AutopilotPanelState &autopilotState,
     const control::ControlInput &input) {
   const bool enabled =
@@ -160,8 +162,8 @@ UI::UIElement MakeThrottleRow(control::ControlInputStrategy &strategy,
         + UI::Button("F")
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnAction([&strategy, &autopilotState] {
-                AdjustManualInput(strategy,
+              .OnAction([&manualController, &autopilotState] {
+                AdjustManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Throttle,
                     -ManualInputStep);
@@ -170,8 +172,8 @@ UI::UIElement MakeThrottleRow(control::ControlInputStrategy &strategy,
         + UI::SliderDouble("##ThrottleInput", input.throttle, 0.0, 1.0)
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnChanged([&strategy, &autopilotState](double value) {
-                SetManualInput(strategy,
+              .OnChanged([&manualController, &autopilotState](double value) {
+                SetManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Throttle,
                     value);
@@ -180,8 +182,8 @@ UI::UIElement MakeThrottleRow(control::ControlInputStrategy &strategy,
         + UI::Button("R")
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnAction([&strategy, &autopilotState] {
-                AdjustManualInput(strategy,
+              .OnAction([&manualController, &autopilotState] {
+                AdjustManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Throttle,
                     ManualInputStep);
@@ -191,7 +193,8 @@ UI::UIElement MakeThrottleRow(control::ControlInputStrategy &strategy,
   // clang-format on
 }
 
-UI::UIElement MakeElevatorRow(control::ControlInputStrategy &strategy,
+UI::UIElement MakeElevatorRow(
+    control::ManualFlightControlController &manualController,
     const AutopilotPanelState &autopilotState,
     const control::ControlInput &input) {
   const bool enabled =
@@ -207,8 +210,8 @@ UI::UIElement MakeElevatorRow(control::ControlInputStrategy &strategy,
         + UI::Button("W")
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnAction([&strategy, &autopilotState] {
-                AdjustManualInput(strategy,
+              .OnAction([&manualController, &autopilotState] {
+                AdjustManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Elevator,
                     -ManualInputStep);
@@ -217,8 +220,8 @@ UI::UIElement MakeElevatorRow(control::ControlInputStrategy &strategy,
         + UI::SliderDouble("##ElevatorInput", input.elevator, -1.0, 1.0)
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnChanged([&strategy, &autopilotState](double value) {
-                SetManualInput(strategy,
+              .OnChanged([&manualController, &autopilotState](double value) {
+                SetManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Elevator,
                     value);
@@ -227,8 +230,8 @@ UI::UIElement MakeElevatorRow(control::ControlInputStrategy &strategy,
         + UI::Button("S")
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnAction([&strategy, &autopilotState] {
-                AdjustManualInput(strategy,
+              .OnAction([&manualController, &autopilotState] {
+                AdjustManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Elevator,
                     ManualInputStep);
@@ -238,7 +241,8 @@ UI::UIElement MakeElevatorRow(control::ControlInputStrategy &strategy,
   // clang-format on
 }
 
-UI::UIElement MakeAileronRow(control::ControlInputStrategy &strategy,
+UI::UIElement MakeAileronRow(
+    control::ManualFlightControlController &manualController,
     const AutopilotPanelState &autopilotState,
     const control::ControlInput &input) {
   const bool enabled =
@@ -254,8 +258,8 @@ UI::UIElement MakeAileronRow(control::ControlInputStrategy &strategy,
         + UI::Button("A")
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnAction([&strategy, &autopilotState] {
-                AdjustManualInput(strategy,
+              .OnAction([&manualController, &autopilotState] {
+                AdjustManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Aileron,
                     -ManualInputStep);
@@ -264,8 +268,8 @@ UI::UIElement MakeAileronRow(control::ControlInputStrategy &strategy,
         + UI::SliderDouble("##AileronInput", input.aileron, -1.0, 1.0)
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnChanged([&strategy, &autopilotState](double value) {
-                SetManualInput(strategy,
+              .OnChanged([&manualController, &autopilotState](double value) {
+                SetManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Aileron,
                     value);
@@ -274,8 +278,8 @@ UI::UIElement MakeAileronRow(control::ControlInputStrategy &strategy,
         + UI::Button("D")
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnAction([&strategy, &autopilotState] {
-                AdjustManualInput(strategy,
+              .OnAction([&manualController, &autopilotState] {
+                AdjustManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Aileron,
                     ManualInputStep);
@@ -285,7 +289,8 @@ UI::UIElement MakeAileronRow(control::ControlInputStrategy &strategy,
   // clang-format on
 }
 
-UI::UIElement MakeRudderRow(control::ControlInputStrategy &strategy,
+UI::UIElement MakeRudderRow(
+    control::ManualFlightControlController &manualController,
     const AutopilotPanelState &autopilotState,
     const control::ControlInput &input) {
   const bool enabled =
@@ -301,8 +306,8 @@ UI::UIElement MakeRudderRow(control::ControlInputStrategy &strategy,
         + UI::Button("Q")
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnAction([&strategy, &autopilotState] {
-                AdjustManualInput(strategy,
+              .OnAction([&manualController, &autopilotState] {
+                AdjustManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Rudder,
                     -ManualInputStep);
@@ -311,8 +316,8 @@ UI::UIElement MakeRudderRow(control::ControlInputStrategy &strategy,
         + UI::SliderDouble("##RudderInput", input.rudder, -1.0, 1.0)
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnChanged([&strategy, &autopilotState](double value) {
-                SetManualInput(strategy,
+              .OnChanged([&manualController, &autopilotState](double value) {
+                SetManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Rudder,
                     value);
@@ -321,8 +326,8 @@ UI::UIElement MakeRudderRow(control::ControlInputStrategy &strategy,
         + UI::Button("E")
               .Enabled(enabled)
               .Tooltip(tooltip)
-              .OnAction([&strategy, &autopilotState] {
-                AdjustManualInput(strategy,
+              .OnAction([&manualController, &autopilotState] {
+                AdjustManualInput(manualController,
                     autopilotState,
                     control::ControlAxis::Rudder,
                     ManualInputStep);
@@ -332,7 +337,8 @@ UI::UIElement MakeRudderRow(control::ControlInputStrategy &strategy,
   // clang-format on
 }
 
-UI::UIElement MakeManualInputLayout(control::ControlInputStrategy &strategy,
+UI::UIElement MakeManualInputLayout(
+    control::ManualFlightControlController &manualController,
     const AutopilotPanelState &autopilotState,
     const control::ControlInput &input, double pitchTrim) {
   // clang-format off
@@ -340,23 +346,24 @@ UI::UIElement MakeManualInputLayout(control::ControlInputStrategy &strategy,
       .Spacing(ManualInputLayoutSpacing)
       [
         +UI::Text("Control Inputs")
-        + MakeThrottleRow(strategy, autopilotState, input)
-        + MakeElevatorRow(strategy, autopilotState, input)
-        + MakeAileronRow(strategy, autopilotState, input)
-        + MakeRudderRow(strategy, autopilotState, input)
+        + MakeThrottleRow(manualController, autopilotState, input)
+        + MakeElevatorRow(manualController, autopilotState, input)
+        + MakeAileronRow(manualController, autopilotState, input)
+        + MakeRudderRow(manualController, autopilotState, input)
         + UI::ValueLabel("Pitch Trim", pitchTrim, "%.3f")
       ];
   // clang-format on
 }
 } // namespace
 
-void ManualControlPanel::Draw(sim::Aircraft &aircraft,
+void ManualControlPanel::Draw(
+    control::ManualFlightControlController &manualController,
+    const sim::Aircraft &aircraft,
     const AutopilotPanelState &autopilotState) {
-  control::ControlInputStrategy &strategy = aircraft.GetControlInputStrategy();
-  ApplyManualInputShortcuts(strategy, autopilotState);
-  MakeManualInputLayout(strategy,
+  ApplyManualInputShortcuts(manualController, autopilotState);
+  MakeManualInputLayout(manualController,
       autopilotState,
-      strategy.GetCommandedInput(),
+      manualController.GetCommandedInput(),
       aircraft.GetFlightControls().GetPitchTrim())
       .Render();
 }

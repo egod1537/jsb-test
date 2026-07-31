@@ -12,6 +12,10 @@
 namespace {
 constexpr const char *SetAllEnginesRunning = "propulsion/set-running";
 
+using gnc::TrimMode;
+using gnc::TrimRequest;
+using gnc::TrimResult;
+
 const char *TrimModeName(gnc::TrimMode mode) {
   switch (mode) {
   case gnc::TrimMode::Longitudinal:
@@ -24,29 +28,8 @@ const char *TrimModeName(gnc::TrimMode mode) {
 
   return "Unknown";
 }
-} // namespace
 
-namespace gnc {
-TrimResult TrimSolver::Trim(sim::Aircraft &aircraft, const TrimRequest &req) {
-  ApplyTrimRequestInitialConditions(aircraft, req);
-  return ExecuteTrim(aircraft, req.mode, true);
-}
-
-TrimResult TrimSolver::TrimCurrentState(sim::Aircraft &aircraft,
-    TrimMode mode) {
-  const sim::InitialCondition currentCondition =
-      aircraft.CaptureCurrentCondition();
-  if (!aircraft.ApplyInitialCondition(currentCondition)) {
-    return {
-        .success = false,
-        .message = "Failed to apply current state as initial condition.",
-    };
-  }
-
-  return ExecuteTrim(aircraft, mode, false);
-}
-
-void TrimSolver::ApplyTrimRequestInitialConditions(sim::Aircraft &aircraft,
+void ApplyTrimRequestInitialConditions(sim::Aircraft &aircraft,
     const TrimRequest &req) {
   auto initialCondition = aircraft.GetFDMExec().GetIC();
   if (req.mode == TrimMode::Ground) {
@@ -58,7 +41,7 @@ void TrimSolver::ApplyTrimRequestInitialConditions(sim::Aircraft &aircraft,
   initialCondition->SetFlightPathAngleDegIC(req.flightPathAngleDeg);
 }
 
-void TrimSolver::PreparePropulsionForTrim(sim::Aircraft &aircraft,
+void PreparePropulsionForTrim(sim::Aircraft &aircraft,
     TrimMode mode) {
   if (mode == TrimMode::Ground) {
     return;
@@ -67,68 +50,16 @@ void TrimSolver::PreparePropulsionForTrim(sim::Aircraft &aircraft,
   aircraft.GetProperties().Set(SetAllEnginesRunning, -1.0);
 }
 
-TrimResult TrimSolver::ExecuteTrim(sim::Aircraft &aircraft, TrimMode mode,
-    bool runInitialCondition) {
-  const std::uint64_t trimId = ++executionCount_;
-  auto &properties = aircraft.GetProperties();
-  auto &fdm = aircraft.GetFDMExec();
-
-  std::cout << "[Trim] begin id=" << trimId << " mode=" << TrimModeName(mode)
-            << " simTime=" << properties.GetSimTimeSec() << '\n';
-
-  try {
-    if (runInitialCondition) {
-      if (!fdm.RunIC()) {
-        std::cout << "[Trim] RunIC failed id=" << trimId
-                  << " simTime=" << properties.GetSimTimeSec() << '\n';
-        return {
-            .success = false,
-            .message = "Failed to apply initial conditions.",
-        };
-      }
-
-      std::cout << "[Trim] RunIC id=" << trimId
-                << " simTime=" << properties.GetSimTimeSec() << '\n';
-    }
-
-    PreparePropulsionForTrim(aircraft, mode);
-
-    const int jsbMode = ToJSBTrimMode(mode);
-    fdm.DoTrim(jsbMode);
-
-    std::cout << "[Trim] DoTrim id=" << trimId
-              << " simTime=" << properties.GetSimTimeSec() << '\n';
-
-    TrimResult result = BuildTrimResult(aircraft);
-    ApplyTrimResultToAircraft(aircraft, result);
-
-    std::cout << "[Trim] end id=" << trimId
-              << " success=true simTime=" << properties.GetSimTimeSec() << '\n';
-
-    return result;
-  } catch (const std::exception &e) {
-    std::cout << "[Trim] end id=" << trimId
-              << " success=false simTime=" << properties.GetSimTimeSec()
-              << " message=" << e.what() << '\n';
-
-    TrimResult result{};
-    result.success = false;
-    result.message = e.what();
-
-    return result;
-  }
-}
-
-TrimResult TrimSolver::BuildTrimResult(const sim::Aircraft &aircraft) const {
+TrimResult BuildTrimResult(const sim::Aircraft &aircraft) {
   const auto &properties = aircraft.GetProperties();
   const auto &flightControls = aircraft.GetFlightControls();
 
   TrimResult result{};
   result.success = true;
-  result.alphaDeg = properties.GetAlphaDeg();
-  result.betaDeg = properties.GetBetaDeg();
-  result.rollDeg = properties.GetRollDeg();
-  result.pitchDeg = properties.GetPitchDeg();
+  result.alphaDeg = properties.Alpha().Deg();
+  result.betaDeg = properties.Beta().Deg();
+  result.rollDeg = properties.Roll().Deg();
+  result.pitchDeg = properties.Pitch().Deg();
 
   result.throttle = flightControls.GetThrottle();
   result.elevator = flightControls.GetElevator();
@@ -136,28 +67,17 @@ TrimResult TrimSolver::BuildTrimResult(const sim::Aircraft &aircraft) const {
   result.aileron = flightControls.GetAileron();
   result.rudder = flightControls.GetRudder();
 
-  result.uDot = properties.GetUDotMps2();
-  result.vDot = properties.GetVDotMps2();
-  result.wDot = properties.GetWDotMps2();
-  result.pDot = properties.GetPdotDegPerSec2();
-  result.qDot = properties.GetQdotDegPerSec2();
-  result.rDot = properties.GetRdotDegPerSec2();
+  result.uDot = properties.U().DotMps2();
+  result.vDot = properties.V().DotMps2();
+  result.wDot = properties.W().DotMps2();
+  result.pDot = properties.P().DotDegPerSec2();
+  result.qDot = properties.Q().DotDegPerSec2();
+  result.rDot = properties.R().DotDegPerSec2();
 
   return result;
 }
 
-void TrimSolver::ApplyTrimResultToAircraft(sim::Aircraft &aircraft,
-    const TrimResult &result) {
-  aircraft.SetAircraftControlInput({
-      .elevator = result.elevator,
-      .aileron = result.aileron,
-      .rudder = result.rudder,
-      .throttle = result.throttle,
-  });
-  aircraft.GetFlightControls().SetPitchTrim(result.pitchTrim);
-}
-
-int TrimSolver::ToJSBTrimMode(TrimMode mode) {
+int ToJSBTrimMode(TrimMode mode) {
   switch (mode) {
   case TrimMode::Longitudinal:
     return JSBSim::tLongitudinal;
@@ -169,4 +89,74 @@ int TrimSolver::ToJSBTrimMode(TrimMode mode) {
 
   return JSBSim::tNone;
 }
-} // namespace gnc
+
+TrimResult ExecuteTrim(sim::Aircraft &aircraft, TrimMode mode,
+    bool runInitialCondition) {
+  auto &properties = aircraft.GetProperties();
+  auto &fdm = aircraft.GetFDMExec();
+
+  std::cout << "[Trim] begin mode=" << TrimModeName(mode)
+            << " simTime=" << properties.SimTime().Sec() << '\n';
+
+  try {
+    if (runInitialCondition) {
+      if (!fdm.RunIC()) {
+        std::cout << "[Trim] RunIC failed simTime="
+                  << properties.SimTime().Sec() << '\n';
+        return {
+            .success = false,
+            .message = "Failed to apply initial conditions.",
+        };
+      }
+
+      std::cout << "[Trim] RunIC simTime=" << properties.SimTime().Sec()
+                << '\n';
+    }
+
+    PreparePropulsionForTrim(aircraft, mode);
+
+    const int jsbMode = ToJSBTrimMode(mode);
+    fdm.DoTrim(jsbMode);
+
+    std::cout << "[Trim] DoTrim simTime=" << properties.SimTime().Sec()
+              << '\n';
+
+    TrimResult result = BuildTrimResult(aircraft);
+
+    std::cout << "[Trim] end success=true simTime="
+              << properties.SimTime().Sec() << '\n';
+
+    return result;
+  } catch (const std::exception &e) {
+    std::cout << "[Trim] end success=false simTime="
+              << properties.SimTime().Sec() << " message=" << e.what()
+              << '\n';
+
+    TrimResult result{};
+    result.success = false;
+    result.message = e.what();
+
+    return result;
+  }
+}
+} // namespace
+
+namespace gnc::TrimSolver {
+TrimResult Solve(sim::Aircraft &aircraft, const TrimRequest &req) {
+  ApplyTrimRequestInitialConditions(aircraft, req);
+  return ExecuteTrim(aircraft, req.mode, true);
+}
+
+TrimResult SolveCurrentState(sim::Aircraft &aircraft, TrimMode mode) {
+  const sim::InitialCondition currentCondition =
+      aircraft.CaptureCurrentCondition();
+  if (!aircraft.ApplyInitialCondition(currentCondition)) {
+    return {
+        .success = false,
+        .message = "Failed to apply current state as initial condition.",
+    };
+  }
+
+  return ExecuteTrim(aircraft, mode, false);
+}
+} // namespace gnc::TrimSolver

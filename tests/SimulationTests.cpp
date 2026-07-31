@@ -1,5 +1,6 @@
 #include "application/sim/Aircraft.hpp"
 #include "application/sim/Simulation.hpp"
+#include "application/sim/control/FlightControlMode.hpp"
 #include "application/sim/state/IStateProvider.hpp"
 
 #include <cmath>
@@ -13,6 +14,7 @@ constexpr double AltitudeToleranceFt = 1.0;
 constexpr double AirspeedToleranceKts = 0.5;
 constexpr double HeadingToleranceDeg = 0.5;
 constexpr double TrimInputTolerance = 1.0e-5;
+constexpr double DegToRad = 0.017453292519943295769;
 
 void Require(bool condition, const std::string &message) {
   if (!condition) {
@@ -223,6 +225,7 @@ void TestStateProvider() {
       simulation.GetAircraft().GetAircraftState();
   const sim::AircraftStateDerivative derivative =
       simulation.GetAircraft().GetAircraftStateDerivative();
+  const auto &properties = simulation.GetAircraft().GetProperties();
 
   RequireNear(state.simTimeSec,
       aircraftState.simulationTimeSec,
@@ -235,6 +238,42 @@ void TestStateProvider() {
   Require(std::isfinite(aircraftState.betaDeg), "Aircraft state beta invalid");
   Require(std::isfinite(derivative.uDotMps2),
       "Aircraft state derivative uDot invalid");
+  RequireNear(properties.Roll().Rad(),
+      aircraftState.rollDeg * DegToRad,
+      SimTimeTolerance,
+      "Flight properties roll rad mismatch");
+  RequireNear(properties.Pitch().Rad(),
+      aircraftState.pitchDeg * DegToRad,
+      SimTimeTolerance,
+      "Flight properties pitch rad mismatch");
+  RequireNear(properties.P().RadPerSec(),
+      aircraftState.pDegPerSec * DegToRad,
+      SimTimeTolerance,
+      "Flight properties roll rate rad mismatch");
+  RequireNear(properties.P().DotRadPerSec2(),
+      derivative.pDotDegPerSec2 * DegToRad,
+      SimTimeTolerance,
+      "Flight properties roll acceleration rad mismatch");
+  RequireNear(properties.TrueAirspeed().Mps(),
+      aircraftState.trueAirspeedMps,
+      SimTimeTolerance,
+      "Flight properties true airspeed mps mismatch");
+  RequireNear(properties.U().Mps(),
+      aircraftState.uMps,
+      SimTimeTolerance,
+      "Flight properties U mps mismatch");
+  RequireNear(properties.U().DotMps2(),
+      derivative.uDotMps2,
+      SimTimeTolerance,
+      "Flight properties U acceleration mismatch");
+  RequireNear(properties.VerticalSpeed().FtPerMin(),
+      properties.VerticalSpeed().Fps() * 60.0,
+      SimTimeTolerance,
+      "Flight properties vertical speed ft/min mismatch");
+  Require(std::isfinite(properties.Alpha().Rad()),
+      "Flight properties alpha rad invalid");
+  Require(std::isfinite(properties.Beta().Rad()),
+      "Flight properties beta rad invalid");
 }
 
 void TestStartAppliesInitialTrim() {
@@ -254,12 +293,81 @@ void TestStartAppliesInitialTrim() {
       "Initial trim changed simulation time");
 }
 
-void TestManualControlInputStrategyAppliesCommands() {
+void TestInitialTrimIsStoredInAutopilot() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  const auto &autopilot = simulation.GetAutopilot();
+  const gnc::TrimResult *trimResult = autopilot.GetTrimResult();
+
+  Require(trimResult != nullptr, "Autopilot did not store initial trim result");
+  Require(trimResult->success, "Autopilot stored a failed initial trim result");
+}
+
+void TestAircraftAxisSettersClampFinalInput() {
+  sim::Aircraft aircraft;
+
+  Require(aircraft.SetElevatorInput(-2.0), "Elevator setter did not change");
+  Require(aircraft.SetAileronInput(2.0), "Aileron setter did not change");
+  Require(aircraft.SetRudderInput(3.0), "Rudder setter did not change");
+  Require(aircraft.SetThrottleInput(0.5), "Throttle setter did not change");
+  Require(aircraft.SetThrottleInput(-1.0), "Throttle setter did not change");
+
+  const control::ControlInput &input = aircraft.GetAircraftControlInput();
+  RequireNear(input.elevator,
+      -1.0,
+      SimTimeTolerance,
+      "Elevator setter did not clamp lower bound");
+  RequireNear(input.aileron,
+      1.0,
+      SimTimeTolerance,
+      "Aileron setter did not clamp upper bound");
+  RequireNear(input.rudder,
+      1.0,
+      SimTimeTolerance,
+      "Rudder setter did not clamp upper bound");
+  RequireNear(input.throttle,
+      0.0,
+      SimTimeTolerance,
+      "Throttle setter did not clamp lower bound");
+}
+
+void TestAircraftSetAircraftControlInputClampsFinalInput() {
+  sim::Aircraft aircraft;
+
+  aircraft.SetAircraftControlInput({
+      .elevator = -2.0,
+      .aileron = 2.0,
+      .rudder = 3.0,
+      .throttle = 2.0,
+  });
+
+  const control::ControlInput &input = aircraft.GetAircraftControlInput();
+  RequireNear(input.elevator,
+      -1.0,
+      SimTimeTolerance,
+      "Aircraft input did not clamp elevator lower bound");
+  RequireNear(input.aileron,
+      1.0,
+      SimTimeTolerance,
+      "Aircraft input did not clamp aileron upper bound");
+  RequireNear(input.rudder,
+      1.0,
+      SimTimeTolerance,
+      "Aircraft input did not clamp rudder upper bound");
+  RequireNear(input.throttle,
+      1.0,
+      SimTimeTolerance,
+      "Aircraft input did not clamp throttle upper bound");
+}
+
+void TestManualFlightControlControllerAppliesCommands() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   auto &aircraft = simulation.GetAircraft();
+  auto &manualController = simulation.GetManualFlightControlController();
 
-  aircraft.SetAircraftControlInput({
+  simulation.SetFlightControlMode(control::FlightControlMode::Manual);
+  manualController.SetCommandedInput({
       .elevator = 0.25,
       .aileron = 2.0,
       .rudder = -0.25,
@@ -267,7 +375,7 @@ void TestManualControlInputStrategyAppliesCommands() {
   });
 
   const control::ControlInput &commandedInput =
-      aircraft.GetControlInputStrategy().GetCommandedInput();
+      manualController.GetCommandedInput();
   RequireNear(commandedInput.throttle,
       0.5,
       SimTimeTolerance,
@@ -275,7 +383,7 @@ void TestManualControlInputStrategyAppliesCommands() {
   RequireNear(commandedInput.aileron,
       1.0,
       SimTimeTolerance,
-      "Aileron command clamp");
+      "Manual controller should clamp commanded aileron");
   RequireNear(commandedInput.elevator,
       0.25,
       SimTimeTolerance,
@@ -285,18 +393,7 @@ void TestManualControlInputStrategyAppliesCommands() {
       SimTimeTolerance,
       "Rudder command mismatch");
 
-  const control::ControlInput &immediateInput =
-      aircraft.GetAircraftControlInput();
-  RequireNear(immediateInput.throttle,
-      0.5,
-      SimTimeTolerance,
-      "Throttle aggregate input was not applied immediately");
-  RequireNear(immediateInput.aileron,
-      1.0,
-      SimTimeTolerance,
-      "Aileron aggregate input was not applied immediately");
-
-  Require(simulation.Update(), "Control strategy update failed");
+  Require(simulation.Update(), "Manual flight control update failed");
 
   const control::ControlInput &actualInput =
       aircraft.GetAircraftControlInput();
@@ -317,6 +414,286 @@ void TestManualControlInputStrategyAppliesCommands() {
       SimTimeTolerance,
       "Rudder command was not applied");
 }
+
+void TestManualModeIgnoresAutopilotController() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &aircraft = simulation.GetAircraft();
+  auto &manualController = simulation.GetManualFlightControlController();
+  auto &autopilot = simulation.GetAutopilot();
+
+  simulation.SetFlightControlMode(control::FlightControlMode::Manual);
+  manualController.SetCommandedInput({
+      .elevator = 0.2,
+      .aileron = -0.8,
+      .rudder = 0.1,
+      .throttle = 0.4,
+  });
+
+  const auto &properties = aircraft.GetProperties();
+  autopilot.SetRollHoldSettings({
+      .targetRollRad = properties.Roll().Rad() + 0.1,
+      .proportionalGain = 0.5,
+      .derivativeGain = 0.0,
+  });
+  autopilot.SetRollHoldEnabled(true);
+
+  Require(simulation.Update(), "Manual mode update failed");
+
+  const control::ControlInput &actualInput = aircraft.GetAircraftControlInput();
+  RequireNear(actualInput.elevator,
+      0.2,
+      SimTimeTolerance,
+      "Manual mode did not apply manual elevator");
+  RequireNear(actualInput.aileron,
+      -0.8,
+      SimTimeTolerance,
+      "Manual mode should ignore autopilot aileron");
+  RequireNear(actualInput.rudder,
+      0.1,
+      SimTimeTolerance,
+      "Manual mode did not apply manual rudder");
+  RequireNear(actualInput.throttle,
+      0.4,
+      SimTimeTolerance,
+      "Manual mode did not apply manual throttle");
+}
+
+void TestRollHoldControllerComputesAileronCommand() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &aircraft = simulation.GetAircraft();
+  auto &rollHold = simulation.GetAutopilot().GetRollHoldController();
+
+  rollHold.SetEnabled(false);
+  Require(!rollHold.Update(aircraft, simulation.GetTickSizeSec()).has_value(),
+      "Disabled roll hold should not produce aileron command");
+
+  const auto &properties = aircraft.GetProperties();
+  const double targetRollRad = properties.Roll().Rad() + 0.2;
+  rollHold.SetTrimAileron(0.1);
+  rollHold.SetSettings({
+      .targetRollRad = targetRollRad,
+      .proportionalGain = 0.5,
+      .derivativeGain = 0.25,
+  });
+  rollHold.SetEnabled(true);
+
+  const auto command = rollHold.Update(aircraft, simulation.GetTickSizeSec());
+  Require(command.has_value(), "Enabled roll hold produced no command");
+
+  const double expectedAileron =
+      0.1 + 0.5 * (targetRollRad - properties.Roll().Rad())
+      - 0.25 * properties.P().RadPerSec();
+  RequireNear(*command,
+      expectedAileron,
+      SimTimeTolerance,
+      "Roll hold aileron command mismatch");
+}
+
+void TestPitchHoldControllerComputesElevatorCommand() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &aircraft = simulation.GetAircraft();
+  auto &pitchHold = simulation.GetAutopilot().GetPitchHoldController();
+
+  pitchHold.SetEnabled(false);
+  Require(!pitchHold.Update(aircraft, simulation.GetTickSizeSec()).has_value(),
+      "Disabled pitch hold should not produce elevator command");
+
+  const auto &properties = aircraft.GetProperties();
+  const double targetPitchRad = properties.Pitch().Rad() + 0.2;
+  pitchHold.SetTrimElevator(0.1);
+  pitchHold.SetSettings({
+      .targetPitchRad = targetPitchRad,
+      .proportionalGain = 0.5,
+      .derivativeGain = 0.25,
+  });
+  pitchHold.SetEnabled(true);
+
+  const auto command = pitchHold.Update(aircraft, simulation.GetTickSizeSec());
+  Require(command.has_value(), "Enabled pitch hold produced no command");
+
+  const double expectedElevator =
+      0.1 - 0.5 * (targetPitchRad - properties.Pitch().Rad())
+      + 0.25 * properties.Q().RadPerSec();
+  RequireNear(*command,
+      expectedElevator,
+      SimTimeTolerance,
+      "Pitch hold elevator command mismatch");
+}
+
+void TestAutopilotModeAppliesAutopilotControllerOutput() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &aircraft = simulation.GetAircraft();
+  auto &manualController = simulation.GetManualFlightControlController();
+  auto &autopilot = simulation.GetAutopilot();
+  const gnc::TrimResult *trimResult = autopilot.GetTrimResult();
+
+  Require(trimResult != nullptr, "Autopilot mode test has no stored trim");
+
+  manualController.SetCommandedInput({
+      .elevator = 0.2,
+      .aileron = -0.8,
+      .rudder = 0.1,
+      .throttle = 0.4,
+  });
+
+  const auto &properties = aircraft.GetProperties();
+  const double rollTargetRad = properties.Roll().Rad() + 0.1;
+  const double pitchTargetRad = properties.Pitch().Rad() + 0.1;
+  autopilot.SetRollHoldSettings({
+      .targetRollRad = rollTargetRad,
+      .proportionalGain = 0.5,
+      .derivativeGain = 0.0,
+  });
+  autopilot.SetRollHoldEnabled(true);
+  autopilot.SetPitchHoldSettings({
+      .targetPitchRad = pitchTargetRad,
+      .proportionalGain = 0.5,
+      .derivativeGain = 0.0,
+  });
+  autopilot.SetPitchHoldEnabled(true);
+  simulation.SetFlightControlMode(control::FlightControlMode::Autopilot);
+
+  const double expectedElevator =
+      control::ClampControlAxisValue(control::ControlAxis::Elevator,
+          trimResult->elevator
+              - 0.5 * (pitchTargetRad - properties.Pitch().Rad()));
+  const double expectedAileron =
+      control::ClampControlAxisValue(control::ControlAxis::Aileron,
+          trimResult->aileron
+              + 0.5 * (rollTargetRad - properties.Roll().Rad()));
+
+  Require(simulation.Update(), "Autopilot mode update failed");
+
+  const control::ControlInput &actualInput = aircraft.GetAircraftControlInput();
+  RequireNear(actualInput.elevator,
+      expectedElevator,
+      SimTimeTolerance,
+      "Autopilot mode did not apply pitch hold elevator");
+  RequireNear(actualInput.aileron,
+      expectedAileron,
+      SimTimeTolerance,
+      "Autopilot mode did not apply roll hold aileron");
+  RequireNear(actualInput.rudder,
+      0.1,
+      SimTimeTolerance,
+      "Autopilot mode should pass through manual rudder");
+  RequireNear(actualInput.throttle,
+      0.4,
+      SimTimeTolerance,
+      "Autopilot mode should pass through manual throttle");
+}
+
+void TestPitchHoldOnlyPassesThroughManualLateralAxes() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &aircraft = simulation.GetAircraft();
+  auto &manualController = simulation.GetManualFlightControlController();
+  auto &autopilot = simulation.GetAutopilot();
+  const gnc::TrimResult *trimResult = autopilot.GetTrimResult();
+
+  Require(trimResult != nullptr, "Pitch hold pass-through test has no trim");
+
+  manualController.SetCommandedInput({
+      .elevator = 0.2,
+      .aileron = -0.8,
+      .rudder = 0.1,
+      .throttle = 0.4,
+  });
+
+  const auto &properties = aircraft.GetProperties();
+  const double pitchTargetRad = properties.Pitch().Rad() + 0.1;
+  autopilot.SetPitchHoldSettings({
+      .targetPitchRad = pitchTargetRad,
+      .proportionalGain = 0.5,
+      .derivativeGain = 0.0,
+  });
+  autopilot.SetPitchHoldEnabled(true);
+  autopilot.SetRollHoldEnabled(false);
+  simulation.SetFlightControlMode(control::FlightControlMode::Autopilot);
+
+  const double expectedElevator =
+      control::ClampControlAxisValue(control::ControlAxis::Elevator,
+          trimResult->elevator
+              - 0.5 * (pitchTargetRad - properties.Pitch().Rad()));
+
+  Require(simulation.Update(), "Pitch hold pass-through update failed");
+
+  const control::ControlInput &actualInput = aircraft.GetAircraftControlInput();
+  RequireNear(actualInput.elevator,
+      expectedElevator,
+      SimTimeTolerance,
+      "Pitch hold did not apply elevator");
+  RequireNear(actualInput.aileron,
+      -0.8,
+      SimTimeTolerance,
+      "Pitch hold should pass through manual aileron");
+  RequireNear(actualInput.rudder,
+      0.1,
+      SimTimeTolerance,
+      "Pitch hold should pass through manual rudder");
+  RequireNear(actualInput.throttle,
+      0.4,
+      SimTimeTolerance,
+      "Pitch hold should pass through manual throttle");
+}
+
+void TestRollHoldOnlyPassesThroughManualLongitudinalAxes() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &aircraft = simulation.GetAircraft();
+  auto &manualController = simulation.GetManualFlightControlController();
+  auto &autopilot = simulation.GetAutopilot();
+  const gnc::TrimResult *trimResult = autopilot.GetTrimResult();
+
+  Require(trimResult != nullptr, "Roll hold pass-through test has no trim");
+
+  manualController.SetCommandedInput({
+      .elevator = 0.2,
+      .aileron = -0.8,
+      .rudder = 0.1,
+      .throttle = 0.4,
+  });
+
+  const auto &properties = aircraft.GetProperties();
+  const double rollTargetRad = properties.Roll().Rad() + 0.1;
+  autopilot.SetRollHoldSettings({
+      .targetRollRad = rollTargetRad,
+      .proportionalGain = 0.5,
+      .derivativeGain = 0.0,
+  });
+  autopilot.SetRollHoldEnabled(true);
+  autopilot.SetPitchHoldEnabled(false);
+  simulation.SetFlightControlMode(control::FlightControlMode::Autopilot);
+
+  const double expectedAileron =
+      control::ClampControlAxisValue(control::ControlAxis::Aileron,
+          trimResult->aileron
+              + 0.5 * (rollTargetRad - properties.Roll().Rad()));
+
+  Require(simulation.Update(), "Roll hold pass-through update failed");
+
+  const control::ControlInput &actualInput = aircraft.GetAircraftControlInput();
+  RequireNear(actualInput.elevator,
+      0.2,
+      SimTimeTolerance,
+      "Roll hold should pass through manual elevator");
+  RequireNear(actualInput.aileron,
+      expectedAileron,
+      SimTimeTolerance,
+      "Roll hold did not apply aileron");
+  RequireNear(actualInput.rudder,
+      0.1,
+      SimTimeTolerance,
+      "Roll hold should pass through manual rudder");
+  RequireNear(actualInput.throttle,
+      0.4,
+      SimTimeTolerance,
+      "Roll hold should pass through manual throttle");
+}
 } // namespace
 
 int main() {
@@ -331,7 +708,16 @@ int main() {
     TestInvalidInitialConditionFails();
     TestStateProvider();
     TestStartAppliesInitialTrim();
-    TestManualControlInputStrategyAppliesCommands();
+    TestInitialTrimIsStoredInAutopilot();
+    TestAircraftAxisSettersClampFinalInput();
+    TestAircraftSetAircraftControlInputClampsFinalInput();
+    TestManualFlightControlControllerAppliesCommands();
+    TestManualModeIgnoresAutopilotController();
+    TestRollHoldControllerComputesAileronCommand();
+    TestPitchHoldControllerComputesElevatorCommand();
+    TestAutopilotModeAppliesAutopilotControllerOutput();
+    TestPitchHoldOnlyPassesThroughManualLateralAxes();
+    TestRollHoldOnlyPassesThroughManualLongitudinalAxes();
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
     return 1;

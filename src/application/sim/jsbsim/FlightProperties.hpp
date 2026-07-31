@@ -4,6 +4,146 @@
 
 namespace JSBSim {
 class FGFDMExec;
+class FlightProperties;
+
+class TimeView {
+public:
+  TimeView(const FlightProperties &properties, const char *secPath);
+
+  double Sec() const;
+
+private:
+  const FlightProperties &properties_;
+  const char *secPath_;
+};
+
+class MutableTimeView {
+public:
+  MutableTimeView(FlightProperties &properties, const char *secPath);
+
+  double Sec() const;
+  void SetSec(double value) const;
+
+private:
+  FlightProperties &properties_;
+  const char *secPath_;
+};
+
+class DistanceView {
+public:
+  DistanceView(const FlightProperties &properties, const char *ftPath);
+
+  double Ft() const;
+
+private:
+  const FlightProperties &properties_;
+  const char *ftPath_;
+};
+
+class MutableDistanceView {
+public:
+  MutableDistanceView(FlightProperties &properties, const char *ftPath);
+
+  double Ft() const;
+  void SetFt(double value) const;
+
+private:
+  FlightProperties &properties_;
+  const char *ftPath_;
+};
+
+class AngleView {
+public:
+  AngleView(const FlightProperties &properties, const char *radPath,
+      const char *degPath);
+
+  double Rad() const;
+  double Deg() const;
+
+private:
+  const FlightProperties &properties_;
+  const char *radPath_;
+  const char *degPath_;
+};
+
+class MutableAngleView {
+public:
+  MutableAngleView(FlightProperties &properties, const char *radPath,
+      const char *degPath);
+
+  double Rad() const;
+  double Deg() const;
+  void SetRad(double value) const;
+  void SetDeg(double value) const;
+
+private:
+  FlightProperties &properties_;
+  const char *radPath_;
+  const char *degPath_;
+};
+
+class AngularRateView {
+public:
+  AngularRateView(const FlightProperties &properties,
+      const char *rateRadPerSecPath, const char *dotRadPerSec2Path);
+
+  double RadPerSec() const;
+  double DegPerSec() const;
+  double DotRadPerSec2() const;
+  double DotDegPerSec2() const;
+
+private:
+  const FlightProperties &properties_;
+  const char *rateRadPerSecPath_;
+  const char *dotRadPerSec2Path_;
+};
+
+class LinearVelocityView {
+public:
+  LinearVelocityView(const FlightProperties &properties,
+      const char *velocityFpsPath, const char *dotFps2Path);
+
+  double Mps() const;
+  double DotMps2() const;
+
+private:
+  const FlightProperties &properties_;
+  const char *velocityFpsPath_;
+  const char *dotFps2Path_;
+};
+
+class SpeedView {
+public:
+  SpeedView(const FlightProperties &properties, const char *fpsPath,
+      const char *ktsPath);
+
+  double Mps() const;
+  double Kts() const;
+  double Fps() const;
+  double FtPerMin() const;
+
+private:
+  const FlightProperties &properties_;
+  const char *fpsPath_;
+  const char *ktsPath_;
+};
+
+class MutableSpeedView {
+public:
+  MutableSpeedView(FlightProperties &properties, const char *fpsPath,
+      const char *ktsPath);
+
+  double Mps() const;
+  double Kts() const;
+  double Fps() const;
+  double FtPerMin() const;
+  void SetKts(double value) const;
+
+private:
+  FlightProperties &properties_;
+  const char *fpsPath_;
+  const char *ktsPath_;
+};
 
 class FlightProperties {
 public:
@@ -12,46 +152,31 @@ public:
   double Get(const std::string &name) const;
   void Set(const std::string &name, double value);
 
-  double GetSimTimeSec() const; // t: simulation time [s]
-  void SetSimTimeSec(double value);
+  MutableTimeView SimTime();
+  TimeView SimTime() const;
 
-  double GetAltitudeAglFt() const; // h_AGL: altitude above ground level [ft]
-  void SetAltitudeAglFt(double value);
+  MutableDistanceView AltitudeAgl();
+  DistanceView AltitudeAgl() const;
 
-  double GetCalibratedAirspeedKts() const; // V_CAS: calibrated airspeed [kt]
-  void SetCalibratedAirspeedKts(double value);
+  MutableSpeedView CalibratedAirspeed();
+  SpeedView CalibratedAirspeed() const;
+  SpeedView TrueAirspeed() const;
+  SpeedView VerticalSpeed() const;
 
-  double GetTrueAirspeedKts() const; // V_TAS: true airspeed [kt]
-  double GetTrueAirspeedMps() const; // V_TAS: true airspeed [m/s]
+  LinearVelocityView U() const;
+  LinearVelocityView V() const;
+  LinearVelocityView W() const;
 
-  double GetUMps() const; // u: body-axis forward velocity [m/s]
-  double GetVMps() const; // v: body-axis lateral velocity [m/s]
-  double GetWMps() const; // w: body-axis vertical velocity [m/s]
+  MutableAngleView Roll();
+  AngleView Roll() const;
+  MutableAngleView Pitch();
+  AngleView Pitch() const;
+  AngleView Alpha() const;
+  AngleView Beta() const;
 
-  double GetVerticalSpeedFps() const;      // h_dot: vertical speed [ft/s]
-  double GetVerticalSpeedFtPerMin() const; // h_dot: vertical speed [ft/min]
-  double GetVerticalSpeedMps() const;      // h_dot: vertical speed [m/s]
-
-  double GetPitchRad() const; // theta: pitch angle [rad]
-  void SetPitchRad(double value);
-
-  double GetRollDeg() const;  // phi: roll angle [deg]
-  double GetPitchDeg() const; // theta: pitch angle [deg]
-
-  double GetAlphaDeg() const; // alpha: angle of attack [deg]
-  double GetBetaDeg() const;  // beta: sideslip angle [deg]
-
-  double GetPDegPerSec() const; // p: roll rate [deg/s]
-  double GetQDegPerSec() const; // q: pitch rate [deg/s]
-  double GetRDegPerSec() const; // r: yaw rate [deg/s]
-
-  double GetUDotMps2() const; // u_dot: body-axis forward acceleration [m/s^2]
-  double GetVDotMps2() const; // v_dot: body-axis lateral acceleration [m/s^2]
-  double GetWDotMps2() const; // w_dot: body-axis vertical acceleration [m/s^2]
-
-  double GetPdotDegPerSec2() const; // p_dot: roll acceleration [deg/s^2]
-  double GetQdotDegPerSec2() const; // q_dot: pitch acceleration [deg/s^2]
-  double GetRdotDegPerSec2() const; // r_dot: yaw acceleration [deg/s^2]
+  AngularRateView P() const;
+  AngularRateView Q() const;
+  AngularRateView R() const;
 
 private:
   FGFDMExec &fdmExec_;

@@ -1,8 +1,11 @@
 #pragma once
 
+#include "application/sim/control/AutopilotFlightControlController.hpp"
+#include "application/sim/control/FlightControlMode.hpp"
 #include "application/sim/control/KeyboardInputSystem.hpp"
+#include "application/sim/control/ManualFlightControlController.hpp"
 #include "application/flightgear/FlightGearSystem.hpp"
-#include "application/sim/gnc/RollHoldSystem.hpp"
+#include "application/sim/gnc/Autopilot.hpp"
 #include "application/sim/InitialCondition.hpp"
 #include "application/sim/Aircraft.hpp"
 #include "application/sim/SimulationConfig.h"
@@ -71,6 +74,13 @@ public:
 
   Aircraft &GetAircraft();
   const Aircraft &GetAircraft() const;
+  control::FlightControlMode GetFlightControlMode() const;
+  void SetFlightControlMode(control::FlightControlMode mode);
+  control::ManualFlightControlController &GetManualFlightControlController();
+  const control::ManualFlightControlController &
+  GetManualFlightControlController() const;
+  gnc::Autopilot &GetAutopilot();
+  const gnc::Autopilot &GetAutopilot() const;
   const state::IStateProvider &GetStateProvider() const;
 
 private:
@@ -91,8 +101,10 @@ private:
 
   Aircraft aircraft_;
   std::unique_ptr<state::IStateProvider> stateProvider_;
+  control::ManualFlightControlController manualControlController_;
   control::KeyboardInputSystem keyboard_;
-  gnc::RollHoldSystem rollHold_;
+  gnc::Autopilot autopilot_;
+  control::AutopilotFlightControlController autopilotControlController_;
   flightgear::FlightGearSystem flightGear_;
   std::vector<sim::System *> systems_;
 
@@ -104,6 +116,8 @@ private:
   std::uint64_t tickIndex_ = 0;
   double nextLogTime_ = 0.0;
   bool started_ = false;
+  control::FlightControlMode flightControlMode_ =
+      control::FlightControlMode::Manual;
   SimulationState state_ = SimulationState::Stopped;
 };
 } // namespace sim

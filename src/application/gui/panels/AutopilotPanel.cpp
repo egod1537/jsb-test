@@ -9,6 +9,7 @@ namespace {
 constexpr float AutopilotTargetInputWidth = 140.0F;
 constexpr float AutopilotGainIndent = 24.0F;
 constexpr float AutopilotGainSliderWidth = 240.0F;
+constexpr float HoldCaptureButtonWidth = 96.0F;
 
 UI::UIElement MakeAutopilotHoldRow(const char *holdLabel,
     const char *targetLabel, const char *inputId, bool &enabled,
@@ -40,14 +41,35 @@ UI::UIElement MakeAutopilotGainSlider(const char *label, const char *sliderId,
                   })];
 }
 
-UI::UIElement MakeRollHoldSection(AutopilotPanelState &state) {
+UI::UIElement MakeRollHoldStatusRow(const AutopilotPanelProps &props) {
+  // clang-format off
+  return UI::HorizontalLayout()
+      .Spacing(8.0F)
+      [
+        +UI::ValueLabel("Current Roll", props.currentRollDeg, "%.2f deg")
+        + UI::ValueLabel("Roll Rate",
+              props.currentRollRateDegPerSec,
+              "%.2f deg/s")
+        + UI::ValueLabel("Aileron", props.currentAileron, "%.3f")
+        + UI::Text(props.rollHoldActive ? "Active" : "Inactive")
+        + UI::Button("Capture")
+              .Enabled(static_cast<bool>(props.captureCurrentRoll))
+              .OnAction(props.captureCurrentRoll)
+              .Width(HoldCaptureButtonWidth)
+      ];
+  // clang-format on
+}
+
+UI::UIElement MakeRollHoldSection(const AutopilotPanelProps &props) {
+  AutopilotPanelState &state = props.state;
   UI::VerticalLayoutBuilder layout =
       UI::VerticalLayout().Spacing(6.0F)
       + MakeAutopilotHoldRow("Roll Hold",
           "Roll (deg)",
           "##RollHoldTarget",
           state.rollHold,
-          state.rollTargetDeg);
+          state.rollTargetDeg)
+      + MakeRollHoldStatusRow(props);
 
   if (state.rollHold) {
     layout =
@@ -65,17 +87,68 @@ UI::UIElement MakeRollHoldSection(AutopilotPanelState &state) {
 
   return layout;
 }
+
+UI::UIElement MakePitchHoldStatusRow(const AutopilotPanelProps &props) {
+  // clang-format off
+  return UI::HorizontalLayout()
+      .Spacing(8.0F)
+      [
+        +UI::ValueLabel("Current Pitch", props.currentPitchDeg, "%.2f deg")
+        + UI::ValueLabel("Pitch Rate",
+              props.currentPitchRateDegPerSec,
+              "%.2f deg/s")
+        + UI::ValueLabel("Elevator", props.currentElevator, "%.3f")
+        + UI::Text(props.pitchHoldActive ? "Active" : "Inactive")
+        + UI::Button("Capture")
+              .Enabled(static_cast<bool>(props.captureCurrentPitch))
+              .OnAction(props.captureCurrentPitch)
+              .Width(HoldCaptureButtonWidth)
+      ];
+  // clang-format on
+}
+
+UI::UIElement MakePitchHoldSection(const AutopilotPanelProps &props) {
+  AutopilotPanelState &state = props.state;
+  UI::VerticalLayoutBuilder layout =
+      UI::VerticalLayout().Spacing(6.0F)
+      + MakeAutopilotHoldRow("Pitch Hold",
+          "Pitch (deg)",
+          "##PitchHoldTarget",
+          state.pitchHold,
+          state.pitchTargetDeg)
+      + MakePitchHoldStatusRow(props);
+
+  if (state.pitchHold) {
+    layout =
+        layout
+        + UI::FoldOut("Pitch Hold Gains")
+              .Open(state.pitchHoldGainsOpen)
+              .SpanAvailWidth()
+              .Id("PitchHoldGains")
+              [UI::VerticalLayout().Spacing(6.0F)
+                  [+MakeAutopilotGainSlider(
+                       "k_p", "##PitchHoldKp", state.pitchHoldKp, 0.1, 5.0)
+                      + MakeAutopilotGainSlider("k_d",
+                          "##PitchHoldKd",
+                          state.pitchHoldKd,
+                          0.02,
+                          2.0)]];
+  }
+
+  return layout;
+}
 } // namespace
 
 void AutopilotPanel::Draw(AutopilotPanelState &state) {
+  Draw({.state = state});
+}
+
+void AutopilotPanel::Draw(const AutopilotPanelProps &props) {
+  AutopilotPanelState &state = props.state;
   UI::VerticalLayout()
       .Spacing(8.0F)[+UI::Heading("Autopilot")
-                     + MakeRollHoldSection(state)
-                     + MakeAutopilotHoldRow("Pitch Hold",
-                         "Pitch (deg)",
-                         "##PitchHoldTarget",
-                         state.pitchHold,
-                         state.pitchTargetDeg)
+                     + MakeRollHoldSection(props)
+                     + MakePitchHoldSection(props)
                      + MakeAutopilotHoldRow("Yaw Hold",
                          "Yaw (deg)",
                          "##YawHoldTarget",

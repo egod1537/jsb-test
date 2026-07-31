@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 namespace gui {
 struct AutopilotPanelState {
   bool rollHold = false;
@@ -17,10 +19,28 @@ struct AutopilotPanelState {
   double rollHoldKp = 0.5;
   double rollHoldKd = 2.0;
   bool rollHoldGainsOpen = true;
+  double pitchHoldKp = 0.5;
+  double pitchHoldKd = 2.0;
+  bool pitchHoldGainsOpen = true;
+};
+
+struct AutopilotPanelProps {
+  AutopilotPanelState &state;
+  double currentRollDeg = 0.0;
+  double currentRollRateDegPerSec = 0.0;
+  double currentAileron = 0.0;
+  bool rollHoldActive = false;
+  std::function<void()> captureCurrentRoll;
+  double currentPitchDeg = 0.0;
+  double currentPitchRateDegPerSec = 0.0;
+  double currentElevator = 0.0;
+  bool pitchHoldActive = false;
+  std::function<void()> captureCurrentPitch;
 };
 
 class AutopilotPanel {
 public:
   static void Draw(AutopilotPanelState &state);
+  static void Draw(const AutopilotPanelProps &props);
 };
 } // namespace gui
