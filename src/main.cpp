@@ -19,6 +19,7 @@ int main() {
 
   sim::SimulationConfig simConfig;
   gui::GUIConfig guiConfig;
+
   std::unique_ptr<sim::Simulation> sim = std::make_unique<sim::Simulation>();
   std::unique_ptr<gui::GUI> gui =
       std::make_unique<gui::GUI>(sim.get(), guiConfig);

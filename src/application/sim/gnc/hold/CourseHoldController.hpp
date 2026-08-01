@@ -1,6 +1,6 @@
 #pragma once
 
-#include "application/sim/System.hpp"
+#include "application/sim/gnc/Controller.hpp"
 
 namespace gnc {
 struct CourseHoldSettings {
@@ -9,10 +9,9 @@ struct CourseHoldSettings {
   double derivativeGain = 2.0;
 };
 
-class CourseHoldController final : public sim::System {
+class CourseHoldController final : public Controller {
 public:
-  void Reset();
-  bool Reset(sim::Context &context) override;
+  void Reset() override;
 
   bool IsEnabled() const;
   void SetEnabled(bool enabled);
@@ -22,8 +21,6 @@ public:
 
   double GetTrimAileron() const;
   void SetTrimAileron(double trimAileron);
-
-  bool PreStep(sim::Context &context, const sim::Tick &tick) override;
 
 private:
   bool enabled_ = false;

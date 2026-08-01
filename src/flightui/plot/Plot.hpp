@@ -12,6 +12,7 @@
 namespace FlightUI {
 class PlotBuilder {
 public:
+  // Lifetime
   explicit PlotBuilder(std::string title);
   PlotBuilder(const PlotBuilder &other);
   PlotBuilder(PlotBuilder &&other) noexcept;
@@ -19,6 +20,7 @@ public:
   PlotBuilder &operator=(PlotBuilder &&other) noexcept;
   ~PlotBuilder();
 
+  // Explicit configuration
   PlotBuilder &SetSize(Vector2 size);
   PlotBuilder &SetWidth(float width);
   PlotBuilder &SetHeight(float height);
@@ -38,6 +40,7 @@ public:
   PlotBuilder &SetLegendVisible(bool visible);
   PlotBuilder &SetOffset(int offset);
 
+  // Fluent configuration
   PlotBuilder &Size(Vector2 size);
   PlotBuilder &Width(float width);
   PlotBuilder &Height(float height);
@@ -57,6 +60,7 @@ public:
   PlotBuilder &LegendVisible(bool visible);
   PlotBuilder &Offset(int offset);
 
+  // Line series
   PlotBuilder &AddLine(std::string label, DataView xValues, DataView yValues);
   PlotBuilder &AddLine(std::string label, DataView xValues, DataView yValues,
       int offset);
@@ -77,6 +81,7 @@ public:
   PlotBuilder &AddLine(std::string label, const std::vector<float> &yValues,
       int offset);
 
+  // Scatter series
   PlotBuilder &AddScatter(std::string label, DataView xValues,
       DataView yValues);
   PlotBuilder &AddScatter(std::string label, DataView xValues, DataView yValues,
@@ -90,9 +95,11 @@ public:
   PlotBuilder &AddScatter(std::string label, const std::vector<float> &xValues,
       const std::vector<float> &yValues, int offset);
 
+  // Element conversion
   operator UIElement() const;
 
 private:
+  // Implementation state
   class Impl;
   std::unique_ptr<Impl> m_Impl;
 };

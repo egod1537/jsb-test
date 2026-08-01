@@ -11,14 +11,17 @@ public:
   ~DeclarativeDemoWindow() override;
 
 protected:
-  void Update(GUI &gui) override;
+  void OnTick(GUI &gui) override;
 
 private:
   void AppendTelemetrySample();
 
+  // Control state
   bool autopilotEnabled_ = false;
   double throttle_ = 0.5;
   double elevator_ = 0.0;
+
+  // Telemetry history
   double lastSampleTime_ = -1.0;
   std::vector<double> timeHistory_;
   std::vector<double> throttleHistory_;

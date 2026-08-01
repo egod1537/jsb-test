@@ -9,7 +9,7 @@ namespace UI = FlightUI;
 
 SamplePlotWindow::SamplePlotWindow() : Window("ImPlot Test") {}
 
-void SamplePlotWindow::OnUpdate(GUI &) {
+void SamplePlotWindow::OnRender(GUI &) {
   constexpr int POINT_COUNT = 240;
 
   std::array<double, POINT_COUNT> xs{};

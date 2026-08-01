@@ -5,20 +5,23 @@ class GUI;
 
 class Component {
 public:
+  // Lifetime
   virtual ~Component() = default;
 
   Component(const Component &) = delete;
   Component &operator=(const Component &) = delete;
 
+  // Enabled state
   bool IsEnabled() const { return enabled_; }
   void SetEnabled(bool enabled) { enabled_ = enabled; }
 
+  // GUI lifecycle entry points
   void StartIfNeeded(GUI &gui) {
     if (!enabled_ || started_) {
       return;
     }
 
-    Start(gui);
+    OnStart(gui);
     started_ = true;
   }
 
@@ -28,16 +31,18 @@ public:
     }
 
     StartIfNeeded(gui);
-    Update(gui);
+    OnTick(gui);
   }
 
 protected:
   Component() = default;
 
-  virtual void Start(GUI &) {}
-  virtual void Update(GUI &) = 0;
+  // Extension hooks
+  virtual void OnStart(GUI &) {}
+  virtual void OnTick(GUI &) = 0;
 
 private:
+  // Lifecycle state
   bool enabled_ = true;
   bool started_ = false;
 };

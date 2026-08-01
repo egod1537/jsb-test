@@ -1,5 +1,6 @@
 #pragma once
 
+#include "application/SimulationExecutionControl.hpp"
 #include "application/gui/Component.hpp"
 #include "application/gui/GUIConfig.hpp"
 #include "application/gui/Window.hpp"
@@ -17,6 +18,7 @@ class FlightVisualizer;
 namespace gui {
 class GUI {
 public:
+  // Lifetime and frame loop
   explicit GUI(sim::Simulation *sim, GUIConfig config = {});
   ~GUI();
 
@@ -24,14 +26,29 @@ public:
   GUI &operator=(const GUI &) = delete;
 
   bool Start();
-  void Update();
+  void Tick();
   void Exit();
 
+  // Window state
   bool ShouldClose() const;
   void RequestClose();
 
   const GUIConfig &GetConfig() const { return config_; }
 
+  // Application control
+  void SetSimulationExecutionControl(
+      application::SimulationExecutionControl *control) {
+    simulationExecutionControl_ = control;
+  }
+  application::SimulationExecutionControl &GetSimulationExecutionControl() {
+    return *simulationExecutionControl_;
+  }
+  const application::SimulationExecutionControl &
+  GetSimulationExecutionControl() const {
+    return *simulationExecutionControl_;
+  }
+
+  // Simulation and visualization
   sim::Simulation &GetSimulation() { return *sim_; }
   const sim::Simulation &GetSimulation() const { return *sim_; }
   viz::FlightVisualizer *GetFlightVisualizer() { return visualizer_.get(); }
@@ -39,6 +56,7 @@ public:
     return visualizer_.get();
   }
 
+  // UI registration
   void RegisterComponent(std::unique_ptr<Component> component);
   void RegisterWindow(std::unique_ptr<Window> window);
 
@@ -63,17 +81,22 @@ public:
   }
 
 private:
+  // Frame lifecycle
   void BeginFrame();
   void RenderFrame();
   void EndFrame();
 
+  // Rendering
   void RenderDockSpace();
   void RenderMainMenuBar();
   void RenderSimulationMenu();
   void RenderWindowMenu();
-  void StartComponents();
-  void UpdateComponents();
 
+  // Component lifecycle
+  void StartComponents();
+  void TickComponents();
+
+  // Platform state
   GLFWwindow *window_ = nullptr;
   bool initialized_ = false;
   bool glfwInitialized_ = false;
@@ -81,10 +104,17 @@ private:
   bool glfwBackendInitialized_ = false;
   bool openGlBackendInitialized_ = false;
 
+  // UI ownership
   std::vector<std::unique_ptr<Component>> components_;
   std::vector<Window *> windows_;
+
+  // Application dependencies
+  application::SimulationExecutionControl *simulationExecutionControl_ =
+      nullptr;
   sim::Simulation *sim_;
   std::unique_ptr<viz::FlightVisualizer> visualizer_;
+
+  // Configuration
   GUIConfig config_;
 };
 } // namespace gui

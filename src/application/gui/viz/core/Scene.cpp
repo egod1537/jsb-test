@@ -12,10 +12,10 @@ GameObject &Scene::CreateGameObject(std::string name) {
 
 void Scene::Clear() { gameObjects_.clear(); }
 
-void Scene::Update(const FrameSnapshot &snapshot) {
-  const UpdateContext context{snapshot};
+void Scene::Tick(const FrameSnapshot &snapshot) {
+  const TickContext context{snapshot};
   for (const auto &gameObject : gameObjects_) {
-    gameObject->Update(context);
+    gameObject->Tick(context);
   }
 }
 

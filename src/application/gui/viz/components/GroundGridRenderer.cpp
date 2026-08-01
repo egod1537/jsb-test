@@ -26,7 +26,7 @@ float SmoothAltitude(float currentAltitude, float targetAltitude) {
                                * AltitudeSmoothing;
 }
 
-float UpdateGridSpacing(float extent, float baseSpacing, float currentSpacing,
+float ResolveGridSpacing(float extent, float baseSpacing, float currentSpacing,
     int maxLinesPerAxis) {
   float spacing = std::max(currentSpacing, baseSpacing);
   const float maxLines = static_cast<float>(maxLinesPerAxis);
@@ -68,7 +68,7 @@ int FadeAlpha(float offset, float extent, int nearAlpha, int farAlpha) {
 } // namespace
 
 namespace viz {
-void GroundGridRenderer::Update(const UpdateContext &context) {
+void GroundGridRenderer::OnTick(const TickContext &context) {
   const float targetAltitude =
       SanitizeAltitude(context.snapshot.visualAltitude);
   if (!hasVisualAltitude_) {
@@ -80,7 +80,7 @@ void GroundGridRenderer::Update(const UpdateContext &context) {
 
   extent_ = std::clamp(visualAltitude_ * 14.0F, 32.0F, 280.0F);
   spacing_ =
-      UpdateGridSpacing(extent_, baseSpacing_, spacing_, maxLinesPerAxis_);
+      ResolveGridSpacing(extent_, baseSpacing_, spacing_, maxLinesPerAxis_);
   const float repeatDistance =
       spacing_ * static_cast<float>(majorLineInterval_);
   GetTransform().SetPosition({

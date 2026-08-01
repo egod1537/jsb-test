@@ -1,14 +1,9 @@
 #include "application/sim/gnc/hold/PitchHoldController.hpp"
 #include "application/sim/Aircraft.hpp"
-#include "application/sim/jsbsim/FlightProperties.hpp"
+#include "application/sim/jsbsim/Properties.hpp"
 
 namespace gnc {
 void PitchHoldController::Reset() {}
-
-bool PitchHoldController::Reset(sim::Context &) {
-  Reset();
-  return true;
-}
 
 bool PitchHoldController::IsEnabled() const { return enabled_; }
 
@@ -28,13 +23,13 @@ void PitchHoldController::SetTrimElevator(double trimElevator) {
   trimElevator_ = trimElevator;
 }
 
-std::optional<double> PitchHoldController::Update(const sim::Aircraft &aircraft,
-    double) {
+std::optional<double> PitchHoldController::OnTick(const sim::Aircraft &aircraft,
+    const sim::Tick &) {
   if (!enabled_) {
     return std::nullopt;
   }
 
-  const JSBSim::FlightProperties &prop = aircraft.GetProperties();
+  const sim::jsbsim::Properties &prop = aircraft.GetProperties();
 
   const double error = settings_.targetPitchRad - prop.Pitch().Rad();
   const double newElevator = GetTrimElevator()
@@ -44,7 +39,4 @@ std::optional<double> PitchHoldController::Update(const sim::Aircraft &aircraft,
   return newElevator;
 }
 
-bool PitchHoldController::PreStep(sim::Context &, const sim::Tick &) {
-  return true;
-}
 } // namespace gnc

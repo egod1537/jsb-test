@@ -4,71 +4,74 @@
 
 namespace JSBSim {
 class FGFDMExec;
-class FlightProperties;
+} // namespace JSBSim
+
+namespace sim::jsbsim {
+class Properties;
 
 class TimeView {
 public:
-  TimeView(const FlightProperties &properties, const char *secPath);
+  TimeView(const Properties &properties, const char *secPath);
 
   double Sec() const;
 
 private:
-  const FlightProperties &properties_;
+  const Properties &properties_;
   const char *secPath_;
 };
 
 class MutableTimeView {
 public:
-  MutableTimeView(FlightProperties &properties, const char *secPath);
+  MutableTimeView(Properties &properties, const char *secPath);
 
   double Sec() const;
   void SetSec(double value) const;
 
 private:
-  FlightProperties &properties_;
+  Properties &properties_;
   const char *secPath_;
 };
 
 class DistanceView {
 public:
-  DistanceView(const FlightProperties &properties, const char *ftPath);
+  DistanceView(const Properties &properties, const char *ftPath);
 
   double Ft() const;
 
 private:
-  const FlightProperties &properties_;
+  const Properties &properties_;
   const char *ftPath_;
 };
 
 class MutableDistanceView {
 public:
-  MutableDistanceView(FlightProperties &properties, const char *ftPath);
+  MutableDistanceView(Properties &properties, const char *ftPath);
 
   double Ft() const;
   void SetFt(double value) const;
 
 private:
-  FlightProperties &properties_;
+  Properties &properties_;
   const char *ftPath_;
 };
 
 class AngleView {
 public:
-  AngleView(const FlightProperties &properties, const char *radPath,
+  AngleView(const Properties &properties, const char *radPath,
       const char *degPath);
 
   double Rad() const;
   double Deg() const;
 
 private:
-  const FlightProperties &properties_;
+  const Properties &properties_;
   const char *radPath_;
   const char *degPath_;
 };
 
 class MutableAngleView {
 public:
-  MutableAngleView(FlightProperties &properties, const char *radPath,
+  MutableAngleView(Properties &properties, const char *radPath,
       const char *degPath);
 
   double Rad() const;
@@ -77,14 +80,14 @@ public:
   void SetDeg(double value) const;
 
 private:
-  FlightProperties &properties_;
+  Properties &properties_;
   const char *radPath_;
   const char *degPath_;
 };
 
 class AngularRateView {
 public:
-  AngularRateView(const FlightProperties &properties,
+  AngularRateView(const Properties &properties,
       const char *rateRadPerSecPath, const char *dotRadPerSec2Path);
 
   double RadPerSec() const;
@@ -93,28 +96,28 @@ public:
   double DotDegPerSec2() const;
 
 private:
-  const FlightProperties &properties_;
+  const Properties &properties_;
   const char *rateRadPerSecPath_;
   const char *dotRadPerSec2Path_;
 };
 
 class LinearVelocityView {
 public:
-  LinearVelocityView(const FlightProperties &properties,
+  LinearVelocityView(const Properties &properties,
       const char *velocityFpsPath, const char *dotFps2Path);
 
   double Mps() const;
   double DotMps2() const;
 
 private:
-  const FlightProperties &properties_;
+  const Properties &properties_;
   const char *velocityFpsPath_;
   const char *dotFps2Path_;
 };
 
 class SpeedView {
 public:
-  SpeedView(const FlightProperties &properties, const char *fpsPath,
+  SpeedView(const Properties &properties, const char *fpsPath,
       const char *ktsPath);
 
   double Mps() const;
@@ -123,14 +126,14 @@ public:
   double FtPerMin() const;
 
 private:
-  const FlightProperties &properties_;
+  const Properties &properties_;
   const char *fpsPath_;
   const char *ktsPath_;
 };
 
 class MutableSpeedView {
 public:
-  MutableSpeedView(FlightProperties &properties, const char *fpsPath,
+  MutableSpeedView(Properties &properties, const char *fpsPath,
       const char *ktsPath);
 
   double Mps() const;
@@ -140,33 +143,37 @@ public:
   void SetKts(double value) const;
 
 private:
-  FlightProperties &properties_;
+  Properties &properties_;
   const char *fpsPath_;
   const char *ktsPath_;
 };
 
-class FlightProperties {
+class Properties {
 public:
-  explicit FlightProperties(FGFDMExec &fdmExec);
+  explicit Properties(JSBSim::FGFDMExec &fdmExec);
 
+  // Raw property access
   double Get(const std::string &name) const;
   void Set(const std::string &name, double value);
 
+  // Simulation time and position
   MutableTimeView SimTime();
   TimeView SimTime() const;
-
   MutableDistanceView AltitudeAgl();
   DistanceView AltitudeAgl() const;
 
+  // Air data
   MutableSpeedView CalibratedAirspeed();
   SpeedView CalibratedAirspeed() const;
   SpeedView TrueAirspeed() const;
   SpeedView VerticalSpeed() const;
 
+  // Body velocity
   LinearVelocityView U() const;
   LinearVelocityView V() const;
   LinearVelocityView W() const;
 
+  // Attitude and aerodynamic angles
   MutableAngleView Roll();
   AngleView Roll() const;
   MutableAngleView Pitch();
@@ -174,11 +181,13 @@ public:
   AngleView Alpha() const;
   AngleView Beta() const;
 
+  // Angular rates
   AngularRateView P() const;
   AngularRateView Q() const;
   AngularRateView R() const;
 
 private:
-  FGFDMExec &fdmExec_;
+  // JSBSim dependency
+  JSBSim::FGFDMExec &fdmExec_;
 };
-} // namespace JSBSim
+} // namespace sim::jsbsim

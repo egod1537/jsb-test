@@ -1,18 +1,21 @@
 #pragma once
 
 #include "application/flightgear/FlightGearSender.hpp"
-#include "application/sim/System.hpp"
+
+#include <memory>
+
+namespace sim {
+class Aircraft;
+}
 
 namespace flightgear {
-class FlightGearSystem final : public sim::System {
+class FlightGearSystem {
 public:
-  bool Initialize(sim::Context &context) override;
-  bool Reset(sim::Context &context) override;
-  bool PostStep(sim::Context &context, const sim::Tick &tick) override;
+  bool Initialize();
+  void Update(const sim::Aircraft &aircraft);
+  void Shutdown();
 
 private:
-  bool Send(sim::Context &context);
-
-  FlightGearSender sender_;
+  std::unique_ptr<FlightGearSender> sender_;
 };
 } // namespace flightgear

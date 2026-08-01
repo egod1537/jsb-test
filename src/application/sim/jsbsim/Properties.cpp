@@ -1,4 +1,4 @@
-#include "application/sim/jsbsim/FlightProperties.hpp"
+#include "application/sim/jsbsim/Properties.hpp"
 
 #include <FGFDMExec.h>
 
@@ -39,13 +39,13 @@ double RadToDegValue(double value) { return value * RadToDeg; }
 double DegToRadValue(double value) { return value * DegToRad; }
 } // namespace
 
-namespace JSBSim {
-TimeView::TimeView(const FlightProperties &properties, const char *secPath)
+namespace sim::jsbsim {
+TimeView::TimeView(const Properties &properties, const char *secPath)
     : properties_(properties), secPath_(secPath) {}
 
 double TimeView::Sec() const { return properties_.Get(secPath_); }
 
-MutableTimeView::MutableTimeView(FlightProperties &properties,
+MutableTimeView::MutableTimeView(Properties &properties,
     const char *secPath)
     : properties_(properties), secPath_(secPath) {}
 
@@ -55,13 +55,13 @@ void MutableTimeView::SetSec(double value) const {
   properties_.Set(secPath_, value);
 }
 
-DistanceView::DistanceView(const FlightProperties &properties,
+DistanceView::DistanceView(const Properties &properties,
     const char *ftPath)
     : properties_(properties), ftPath_(ftPath) {}
 
 double DistanceView::Ft() const { return properties_.Get(ftPath_); }
 
-MutableDistanceView::MutableDistanceView(FlightProperties &properties,
+MutableDistanceView::MutableDistanceView(Properties &properties,
     const char *ftPath)
     : properties_(properties), ftPath_(ftPath) {}
 
@@ -71,7 +71,7 @@ void MutableDistanceView::SetFt(double value) const {
   properties_.Set(ftPath_, value);
 }
 
-AngleView::AngleView(const FlightProperties &properties, const char *radPath,
+AngleView::AngleView(const Properties &properties, const char *radPath,
     const char *degPath)
     : properties_(properties), radPath_(radPath), degPath_(degPath) {}
 
@@ -91,7 +91,7 @@ double AngleView::Deg() const {
   return RadToDegValue(Rad());
 }
 
-MutableAngleView::MutableAngleView(FlightProperties &properties,
+MutableAngleView::MutableAngleView(Properties &properties,
     const char *radPath, const char *degPath)
     : properties_(properties), radPath_(radPath), degPath_(degPath) {}
 
@@ -133,7 +133,7 @@ void MutableAngleView::SetDeg(double value) const {
   }
 }
 
-AngularRateView::AngularRateView(const FlightProperties &properties,
+AngularRateView::AngularRateView(const Properties &properties,
     const char *rateRadPerSecPath, const char *dotRadPerSec2Path)
     : properties_(properties), rateRadPerSecPath_(rateRadPerSecPath),
       dotRadPerSec2Path_(dotRadPerSec2Path) {}
@@ -154,7 +154,7 @@ double AngularRateView::DotDegPerSec2() const {
   return RadToDegValue(DotRadPerSec2());
 }
 
-LinearVelocityView::LinearVelocityView(const FlightProperties &properties,
+LinearVelocityView::LinearVelocityView(const Properties &properties,
     const char *velocityFpsPath, const char *dotFps2Path)
     : properties_(properties), velocityFpsPath_(velocityFpsPath),
       dotFps2Path_(dotFps2Path) {}
@@ -167,7 +167,7 @@ double LinearVelocityView::DotMps2() const {
   return FeetPerSec2ToMetersPerSec2(properties_.Get(dotFps2Path_));
 }
 
-SpeedView::SpeedView(const FlightProperties &properties, const char *fpsPath,
+SpeedView::SpeedView(const Properties &properties, const char *fpsPath,
     const char *ktsPath)
     : properties_(properties), fpsPath_(fpsPath), ktsPath_(ktsPath) {}
 
@@ -191,7 +191,7 @@ double SpeedView::Fps() const {
 
 double SpeedView::FtPerMin() const { return Fps() * 60.0; }
 
-MutableSpeedView::MutableSpeedView(FlightProperties &properties,
+MutableSpeedView::MutableSpeedView(Properties &properties,
     const char *fpsPath, const char *ktsPath)
     : properties_(properties), fpsPath_(fpsPath), ktsPath_(ktsPath) {}
 
@@ -228,94 +228,94 @@ void MutableSpeedView::SetKts(double value) const {
   }
 }
 
-FlightProperties::FlightProperties(FGFDMExec &fdmExec)
+Properties::Properties(JSBSim::FGFDMExec &fdmExec)
     : fdmExec_(fdmExec) {}
 
-double FlightProperties::Get(const std::string &name) const {
+double Properties::Get(const std::string &name) const {
   return fdmExec_.GetPropertyValue(name);
 }
 
-void FlightProperties::Set(const std::string &name, double value) {
+void Properties::Set(const std::string &name, double value) {
   fdmExec_.SetPropertyValue(name, value);
 }
 
-MutableTimeView FlightProperties::SimTime() {
+MutableTimeView Properties::SimTime() {
   return MutableTimeView(*this, SimTimeSec);
 }
 
-TimeView FlightProperties::SimTime() const {
+TimeView Properties::SimTime() const {
   return TimeView(*this, SimTimeSec);
 }
 
-MutableDistanceView FlightProperties::AltitudeAgl() {
+MutableDistanceView Properties::AltitudeAgl() {
   return MutableDistanceView(*this, AltitudeAglFt);
 }
 
-DistanceView FlightProperties::AltitudeAgl() const {
+DistanceView Properties::AltitudeAgl() const {
   return DistanceView(*this, AltitudeAglFt);
 }
 
-MutableSpeedView FlightProperties::CalibratedAirspeed() {
+MutableSpeedView Properties::CalibratedAirspeed() {
   return MutableSpeedView(*this, nullptr, CalibratedAirspeedKts);
 }
 
-SpeedView FlightProperties::CalibratedAirspeed() const {
+SpeedView Properties::CalibratedAirspeed() const {
   return SpeedView(*this, nullptr, CalibratedAirspeedKts);
 }
 
-SpeedView FlightProperties::TrueAirspeed() const {
+SpeedView Properties::TrueAirspeed() const {
   return SpeedView(*this, TrueAirspeedFps, TrueAirspeedKts);
 }
 
-SpeedView FlightProperties::VerticalSpeed() const {
+SpeedView Properties::VerticalSpeed() const {
   return SpeedView(*this, VerticalSpeedFps, nullptr);
 }
 
-LinearVelocityView FlightProperties::U() const {
+LinearVelocityView Properties::U() const {
   return LinearVelocityView(*this, UFps, UDotFtPerSec2);
 }
 
-LinearVelocityView FlightProperties::V() const {
+LinearVelocityView Properties::V() const {
   return LinearVelocityView(*this, VFps, VDotFtPerSec2);
 }
 
-LinearVelocityView FlightProperties::W() const {
+LinearVelocityView Properties::W() const {
   return LinearVelocityView(*this, WFps, WDotFtPerSec2);
 }
 
-MutableAngleView FlightProperties::Roll() {
+MutableAngleView Properties::Roll() {
   return MutableAngleView(*this, RollRad, nullptr);
 }
 
-AngleView FlightProperties::Roll() const {
+AngleView Properties::Roll() const {
   return AngleView(*this, RollRad, nullptr);
 }
 
-MutableAngleView FlightProperties::Pitch() {
+MutableAngleView Properties::Pitch() {
   return MutableAngleView(*this, PitchRad, nullptr);
 }
 
-AngleView FlightProperties::Pitch() const {
+AngleView Properties::Pitch() const {
   return AngleView(*this, PitchRad, nullptr);
 }
 
-AngleView FlightProperties::Alpha() const {
+AngleView Properties::Alpha() const {
   return AngleView(*this, nullptr, AlphaDeg);
 }
 
-AngleView FlightProperties::Beta() const {
+AngleView Properties::Beta() const {
   return AngleView(*this, nullptr, BetaDeg);
 }
 
-AngularRateView FlightProperties::P() const {
+AngularRateView Properties::P() const {
   return AngularRateView(*this, RollRateRadPerSec, PdotRadPerSec2);
 }
 
-AngularRateView FlightProperties::Q() const {
+AngularRateView Properties::Q() const {
   return AngularRateView(*this, PitchRateRadPerSec, QdotRadPerSec2);
 }
 
-AngularRateView FlightProperties::R() const {
+AngularRateView Properties::R() const {
   return AngularRateView(*this, YawRateRadPerSec, RdotRadPerSec2);
 }
-} // namespace JSBSim
+} // namespace sim::jsbsim

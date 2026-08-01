@@ -17,10 +17,10 @@ public:
   bool *GetVisiblePtr() { return &visible_; }
 
 protected:
-  void Update(GUI &gui) final;
+  void OnTick(GUI &gui) final;
 
   virtual ImGuiWindowFlags GetWindowFlags() const;
-  virtual void OnUpdate(GUI &gui) = 0;
+  virtual void OnRender(GUI &gui) = 0;
 
 private:
   std::string title_;

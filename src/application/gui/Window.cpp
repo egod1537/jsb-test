@@ -6,13 +6,13 @@ Window::Window(std::string title) : title_(std::move(title)) {}
 
 Window::~Window() = default;
 
-void Window::Update(GUI &gui) {
+void Window::OnTick(GUI &gui) {
   if (!visible_) {
     return;
   }
 
   if (ImGui::Begin(title_.c_str(), &visible_, GetWindowFlags())) {
-    OnUpdate(gui);
+    OnRender(gui);
   }
   ImGui::End();
 }

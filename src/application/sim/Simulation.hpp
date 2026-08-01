@@ -1,123 +1,100 @@
 #pragma once
 
-#include "application/sim/control/AutopilotFlightControlController.hpp"
-#include "application/sim/control/FlightControlMode.hpp"
-#include "application/sim/control/KeyboardInputSystem.hpp"
-#include "application/sim/control/ManualFlightControlController.hpp"
-#include "application/flightgear/FlightGearSystem.hpp"
-#include "application/sim/gnc/Autopilot.hpp"
-#include "application/sim/InitialCondition.hpp"
 #include "application/sim/Aircraft.hpp"
+#include "application/sim/Component.hpp"
+#include "application/sim/ErrorTracker.hpp"
+#include "application/sim/InitialCondition.hpp"
 #include "application/sim/SimulationConfig.h"
-#include "application/sim/System.hpp"
 #include "application/sim/Tick.hpp"
-#include "application/sim/state/IStateProvider.hpp"
+#include "application/sim/control/FlightControlManager.hpp"
+
 #include <cstdint>
 #include <memory>
-#include <optional>
-#include <string>
+#include <type_traits>
+#include <typeinfo>
+#include <utility>
 #include <vector>
 
 namespace sim {
-class Context;
-
-enum class SimulationState {
-  Running,
-  Paused,
-  Stopped,
-};
-
-const char *ToString(SimulationState state);
-
 class Simulation {
 public:
+  // Lifetime and stepping
   Simulation();
   ~Simulation();
 
   Simulation(const Simulation &) = delete;
   Simulation &operator=(const Simulation &) = delete;
 
-  bool Start(const SimulationConfig &);
-  bool Update();
-  void Exit();
-
   bool Initialize(const SimulationConfig &);
+  bool Tick();
+  void Shutdown();
 
-  const SimulationConfig &GetConfig() const { return config_; }
-  double GetTickSizeSec() const { return config_.GetDT(); }
+  // Configuration
+  const SimulationConfig &GetConfig() const;
+  double GetTickSizeSec() const;
 
-  SimulationState GetState() const { return state_; }
-  bool IsRunning() const { return state_ == SimulationState::Running; }
-  bool IsPaused() const { return state_ == SimulationState::Paused; }
-  bool IsStopped() const { return state_ == SimulationState::Stopped; }
+  // Initial condition
+  bool Reset();
+  bool Reset(const InitialCondition &initialCondition);
+  InitialCondition GetCurrentCondition() const;
+  const InitialCondition &GetDefaultInitialCondition() const;
 
-  void Pause();
-  void Resume();
-  void TogglePause();
-
-  bool RequestStep();
-  bool StepOnce();
-  std::uint32_t GetPendingStepCount() const { return pendingSteps_; }
-
-  bool SetInitialCondition(const InitialCondition &initialCondition);
-  bool Restart();
-  bool Restart(const InitialCondition &initialCondition);
-  InitialCondition CaptureCurrentCondition() const;
-  const InitialCondition &GetInitialCondition() const {
-    return initialCondition_;
-  }
-  const InitialCondition &GetDefaultInitialCondition() const {
-    return defaultInitialCondition_;
-  }
-  const std::optional<std::string> &GetLastError() const { return lastError_; }
-  void ClearLastError() { lastError_.reset(); }
-
+  // Aircraft
   Aircraft &GetAircraft();
   const Aircraft &GetAircraft() const;
-  control::FlightControlMode GetFlightControlMode() const;
-  void SetFlightControlMode(control::FlightControlMode mode);
-  control::ManualFlightControlController &GetManualFlightControlController();
-  const control::ManualFlightControlController &
-  GetManualFlightControlController() const;
-  gnc::Autopilot &GetAutopilot();
-  const gnc::Autopilot &GetAutopilot() const;
-  const state::IStateProvider &GetStateProvider() const;
+
+  // Components
+  template <typename T, typename... Args> T *AddComponent(Args &&...args);
+  template <typename T> T *GetComponent();
+  template <typename T> const T *GetComponent() const;
+  template <typename T> bool RemoveComponent();
+
+  // Diagnostics
+  ErrorTracker &GetErrorTracker();
+  const ErrorTracker &GetErrorTracker() const;
 
 private:
-  bool AdvanceOneTick();
-  Context MakeContext();
-  bool InitializeSystems();
-  bool ResetSystems();
-  bool RunPreStepSystems(const Tick &tick);
-  bool RunPostStepSystems(const Tick &tick);
-  void ShutdownSystems();
-  void RegisterSystems();
+  // Tick processing
+  bool ProcessTick();
+  sim::Tick MakeTick() const;
+
+  // Initial condition
   bool ApplyInitialTrim(const InitialCondition &initialCondition);
-  Tick MakeTick() const;
-  void ResetLogTimer();
-  void PrintState() const;
-  bool ValidateInitialCondition(const InitialCondition &initialCondition);
-  void SetError(std::string message);
 
-  Aircraft aircraft_;
-  std::unique_ptr<state::IStateProvider> stateProvider_;
-  control::ManualFlightControlController manualControlController_;
-  control::KeyboardInputSystem keyboard_;
-  gnc::Autopilot autopilot_;
-  control::AutopilotFlightControlController autopilotControlController_;
-  flightgear::FlightGearSystem flightGear_;
-  std::vector<sim::System *> systems_;
+  // Components
+  bool InitializeComponent(Component &component);
+  bool InitializeComponents();
+  bool ResetComponents();
+  bool RunPreTickComponents(const sim::Tick &tick);
+  bool TickComponents(const sim::Tick &tick);
+  bool RunPostTickComponents(const sim::Tick &tick);
+  void ShutdownComponents();
+  Component *FindComponent(const std::type_info &type);
+  const Component *FindComponent(const std::type_info &type) const;
 
+  // Configuration
   SimulationConfig config_;
+
+  // Runtime state
+  bool initialized_ = false;
+
+  // Initial condition
   InitialCondition defaultInitialCondition_;
-  InitialCondition initialCondition_;
-  std::optional<std::string> lastError_;
-  std::uint32_t pendingSteps_ = 0;
+
+  // Simulation clock
   std::uint64_t tickIndex_ = 0;
-  double nextLogTime_ = 0.0;
-  bool started_ = false;
-  control::FlightControlMode flightControlMode_ =
-      control::FlightControlMode::Manual;
-  SimulationState state_ = SimulationState::Stopped;
+
+  // Aircraft state
+  Aircraft aircraft_;
+
+  // Components
+  std::vector<std::unique_ptr<Component>> components_;
+
+  // Diagnostics
+  ErrorTracker errorTracker_;
+
+  friend class Component;
 };
 } // namespace sim
+
+#include "application/sim/Simulation.inl"

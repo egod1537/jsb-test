@@ -3,11 +3,6 @@
 namespace gnc {
 void AltitudeHoldController::Reset() {}
 
-bool AltitudeHoldController::Reset(sim::Context &) {
-  Reset();
-  return true;
-}
-
 bool AltitudeHoldController::IsEnabled() const { return enabled_; }
 
 void AltitudeHoldController::SetEnabled(bool enabled) { enabled_ = enabled; }
@@ -16,20 +11,14 @@ const AltitudeHoldSettings &AltitudeHoldController::GetSettings() const {
   return settings_;
 }
 
-void AltitudeHoldController::SetSettings(
-    const AltitudeHoldSettings &settings) {
+void AltitudeHoldController::SetSettings(const AltitudeHoldSettings &settings) {
   settings_ = settings;
 }
 
-double AltitudeHoldController::GetTrimElevator() const {
-  return trimElevator_;
-}
+double AltitudeHoldController::GetTrimElevator() const { return trimElevator_; }
 
 void AltitudeHoldController::SetTrimElevator(double trimElevator) {
   trimElevator_ = trimElevator;
 }
 
-bool AltitudeHoldController::PreStep(sim::Context &, const sim::Tick &) {
-  return true;
-}
 } // namespace gnc

@@ -1,7 +1,9 @@
 #include "application/sim/Aircraft.hpp"
+#include "application/sim/ErrorTracker.hpp"
 #include "application/sim/Simulation.hpp"
+#include "application/sim/StateLogger.hpp"
+#include "application/sim/control/FlightControlManager.hpp"
 #include "application/sim/control/FlightControlMode.hpp"
-#include "application/sim/state/IStateProvider.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -33,166 +35,290 @@ void RequireNear(double actual, double expected, double tolerance,
 sim::SimulationConfig MakeConfig() {
   sim::SimulationConfig config{};
   config.simulationHz = 120.0;
-  config.altitudeFt = 1000.0;
-  config.calibratedAirspeedKts = 80.0;
-  config.headingDeg = 0.0;
   return config;
 }
 
 void StartSimulation(sim::Simulation &simulation) {
-  Require(simulation.Start(MakeConfig()), "Simulation failed to start");
+  Require(simulation.Initialize(MakeConfig()),
+      "Simulation failed to initialize");
 }
 
 double GetSimTime(const sim::Simulation &simulation) {
   return simulation.GetAircraft().GetAircraftState().simulationTimeSec;
 }
 
-void TestPauseStopsTime() {
-  sim::Simulation simulation;
-  StartSimulation(simulation);
-
-  Require(simulation.Update(), "Initial update failed");
-  simulation.Pause();
-  const double pausedTime = GetSimTime(simulation);
-
-  for (int i = 0; i < 5; ++i) {
-    Require(simulation.Update(), "Paused update failed");
-  }
-
-  RequireNear(GetSimTime(simulation),
-      pausedTime,
-      SimTimeTolerance,
-      "Paused simulation time advanced");
+sim::Tick MakeTestTick(const sim::Simulation &simulation) {
+  return {0U, simulation.GetTickSizeSec(), GetSimTime(simulation)};
 }
 
-void TestStepOnceAdvancesOneTick() {
+control::FlightControlManager &GetFlightControlManager(
+    sim::Simulation &simulation) {
+  auto *flightControlManager =
+      simulation.GetComponent<control::FlightControlManager>();
+  Require(flightControlManager != nullptr,
+      "Simulation does not contain FlightControlManager");
+  return *flightControlManager;
+}
+
+struct ComponentLifecycleCounts {
+  int initialize = 0;
+  int reset = 0;
+  int preTick = 0;
+  int tick = 0;
+  int postTick = 0;
+  int shutdown = 0;
+};
+
+class LifecycleTestComponent final : public sim::Component {
+public:
+  explicit LifecycleTestComponent(ComponentLifecycleCounts &counts)
+      : counts_(counts) {}
+
+protected:
+  bool OnInitialize() override {
+    ++counts_.initialize;
+    return true;
+  }
+  bool OnReset() override {
+    ++counts_.reset;
+    return true;
+  }
+  bool OnPreTick(const sim::Tick &) override {
+    ++counts_.preTick;
+    return true;
+  }
+  bool OnTick(const sim::Tick &) override {
+    ++counts_.tick;
+    return true;
+  }
+  bool OnPostTick(const sim::Tick &) override {
+    ++counts_.postTick;
+    return true;
+  }
+  void OnShutdown() override { ++counts_.shutdown; }
+
+private:
+  ComponentLifecycleCounts &counts_;
+};
+
+class ComponentLookupTestComponent final : public sim::Component {
+public:
+  bool FoundLifecycleComponent() const { return foundLifecycleComponent_; }
+  bool HasAircraftAccess() const { return hasAircraftAccess_; }
+
+protected:
+  bool OnInitialize() override {
+    foundLifecycleComponent_ =
+        GetComponent<LifecycleTestComponent>() != nullptr;
+    hasAircraftAccess_ =
+        std::isfinite(GetAircraft().GetAircraftState().simulationTimeSec);
+    return foundLifecycleComponent_ && hasAircraftAccess_;
+  }
+
+private:
+  bool foundLifecycleComponent_ = false;
+  bool hasAircraftAccess_ = false;
+};
+
+class RegistryTestController final : public gnc::Controller {
+public:
+  explicit RegistryTestController(int &resetCount) : resetCount_(resetCount) {}
+
+  void Reset() override { ++resetCount_; }
+
+private:
+  int &resetCount_;
+};
+
+void TestErrorTrackerOwnsErrorState() {
+  sim::ErrorTracker errorTracker;
+  Require(!errorTracker.HasError(), "New error tracker contains an error");
+
+  errorTracker.SetError("specific error");
+  errorTracker.SetErrorIfEmpty("fallback error");
+  Require(errorTracker.GetLastError() == "specific error",
+      "Fallback replaced a specific error");
+
+  errorTracker.ClearError();
+  Require(!errorTracker.HasError(), "Error tracker did not clear its error");
+
+  errorTracker.SetErrorIfEmpty("fallback error");
+  Require(errorTracker.GetLastError() == "fallback error",
+      "Fallback error was not stored");
+}
+
+void TestSimulationComponentLifecycle() {
+  sim::Simulation simulation;
+  ComponentLifecycleCounts counts;
+  auto *component = simulation.AddComponent<LifecycleTestComponent>(counts);
+  auto *lookup = simulation.AddComponent<ComponentLookupTestComponent>();
+
+  Require(component != nullptr, "Failed to add lifecycle test component");
+  Require(lookup != nullptr, "Failed to add component lookup test component");
+  Require(simulation.GetComponent<sim::StateLogger>() != nullptr,
+      "Simulation does not contain StateLogger");
+  Require(counts.initialize == 0,
+      "Component initialized before Simulation initialization");
+  Require(simulation.GetComponent<LifecycleTestComponent>() == component,
+      "GetComponent did not return the added component");
+
+  StartSimulation(simulation);
+  Require(counts.initialize == 1, "Component was not initialized");
+  Require(lookup->FoundLifecycleComponent(),
+      "Component could not find another component through its owner");
+  Require(lookup->HasAircraftAccess(),
+      "Component could not access Aircraft through its protected helper");
+
+  const sim::Simulation &constSimulation = simulation;
+  Require(constSimulation.GetComponent<ComponentLookupTestComponent>()
+              == lookup,
+      "Const GetComponent did not return the added component");
+
+  Require(simulation.Tick(), "Component lifecycle tick failed");
+  Require(counts.preTick == 1 && counts.tick == 1 && counts.postTick == 1,
+      "Component tick lifecycle hooks were not called");
+
+  Require(simulation.Reset(), "Component lifecycle reset failed");
+  Require(counts.reset == 1, "Component reset hook was not called");
+
+  Require(simulation.RemoveComponent<LifecycleTestComponent>(),
+      "Failed to remove lifecycle test component");
+  Require(counts.shutdown == 1,
+      "Removing a component did not run its shutdown hook");
+  Require(simulation.GetComponent<LifecycleTestComponent>() == nullptr,
+      "Removed component is still accessible");
+
+  ComponentLifecycleCounts lateCounts;
+  auto *lateComponent =
+      simulation.AddComponent<LifecycleTestComponent>(lateCounts);
+  Require(lateComponent != nullptr, "Failed to add late component");
+  Require(lateCounts.initialize == 1,
+      "Component added after initialization was not initialized immediately");
+  Require(simulation.RemoveComponent<LifecycleTestComponent>(),
+      "Failed to remove late component");
+  Require(lateCounts.shutdown == 1,
+      "Late component shutdown hook was not called");
+
+  simulation.Shutdown();
+}
+
+void TestTickAdvancesOneStep() {
   sim::Simulation simulation;
   StartSimulation(simulation);
-  simulation.Pause();
 
   const double startTime = GetSimTime(simulation);
-  Require(simulation.RequestStep(), "Step request while paused failed");
-  Require(simulation.Update(), "Stepped update failed");
-
-  const double steppedTime = GetSimTime(simulation);
-  RequireNear(steppedTime,
+  Require(simulation.Tick(), "Simulation tick failed");
+  RequireNear(GetSimTime(simulation),
       startTime + simulation.GetTickSizeSec(),
       SimTimeTolerance,
-      "Step once did not advance by one tick");
-
-  for (int i = 0; i < 3; ++i) {
-    Require(simulation.Update(), "Post-step paused update failed");
-  }
-
-  RequireNear(GetSimTime(simulation),
-      steppedTime,
-      SimTimeTolerance,
-      "Paused simulation advanced after consuming step request");
+      "Tick did not advance exactly one simulation step");
 }
 
-void TestResumeAdvancesTime() {
-  sim::Simulation simulation;
-  StartSimulation(simulation);
-  simulation.Pause();
-  const double pausedTime = GetSimTime(simulation);
-
-  simulation.Resume();
-  Require(simulation.Update(), "Resume update failed");
-
-  Require(GetSimTime(simulation) > pausedTime,
-      "Simulation time did not advance after resume");
-}
-
-void TestRestartUsesStoredInitialCondition() {
+void TestResetUsesDefaultInitialCondition() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   for (int i = 0; i < 3; ++i) {
-    Require(simulation.Update(), "Pre-restart update failed");
+    Require(simulation.Tick(), "Pre-reset tick failed");
   }
 
-  Require(simulation.Restart(), "Restart failed");
+  Require(simulation.Reset(), "Reset failed");
 
   RequireNear(GetSimTime(simulation),
       0.0,
       SimTimeTolerance,
-      "Restart did not reset simulation time");
+      "Reset did not reset simulation time");
 
-  const sim::InitialCondition captured = simulation.CaptureCurrentCondition();
+  const sim::InitialCondition captured = simulation.GetCurrentCondition();
+  const sim::InitialCondition &defaultInitialCondition =
+      simulation.GetDefaultInitialCondition();
   RequireNear(captured.altitudeFt,
-      simulation.GetInitialCondition().altitudeFt,
+      defaultInitialCondition.altitudeFt,
       AltitudeToleranceFt,
-      "Restart altitude does not match stored IC");
+      "Reset altitude does not match default IC");
   RequireNear(captured.airspeedKts,
-      simulation.GetInitialCondition().airspeedKts,
+      defaultInitialCondition.airspeedKts,
       AirspeedToleranceKts,
-      "Restart airspeed does not match stored IC");
+      "Reset airspeed does not match default IC");
 }
 
-void TestRestartWithInitialCondition() {
+void TestResetWithInitialCondition() {
   sim::Simulation simulation;
   StartSimulation(simulation);
 
-  sim::InitialCondition initialCondition = simulation.GetInitialCondition();
+  sim::InitialCondition initialCondition =
+      simulation.GetDefaultInitialCondition();
   initialCondition.altitudeFt = 2500.0;
   initialCondition.headingDeg = 45.0;
   initialCondition.airspeedKts = 95.0;
 
-  Require(simulation.Restart(initialCondition),
-      "Restart with custom IC failed");
+  Require(simulation.Reset(initialCondition), "Reset with custom IC failed");
 
-  const sim::InitialCondition captured = simulation.CaptureCurrentCondition();
+  const sim::InitialCondition captured = simulation.GetCurrentCondition();
   RequireNear(captured.altitudeFt,
       initialCondition.altitudeFt,
       AltitudeToleranceFt,
-      "Custom restart altitude mismatch");
+      "Custom reset altitude mismatch");
   RequireNear(captured.headingDeg,
       initialCondition.headingDeg,
       HeadingToleranceDeg,
-      "Custom restart heading mismatch");
+      "Custom reset heading mismatch");
   RequireNear(captured.airspeedKts,
       initialCondition.airspeedKts,
       AirspeedToleranceKts,
-      "Custom restart airspeed mismatch");
+      "Custom reset airspeed mismatch");
+
+  Require(simulation.Reset(), "Default reset after custom reset failed");
+  const sim::InitialCondition restoredDefault =
+      simulation.GetCurrentCondition();
+  RequireNear(restoredDefault.altitudeFt,
+      simulation.GetDefaultInitialCondition().altitudeFt,
+      AltitudeToleranceFt,
+      "Custom reset replaced the default altitude");
+  RequireNear(restoredDefault.airspeedKts,
+      simulation.GetDefaultInitialCondition().airspeedKts,
+      AirspeedToleranceKts,
+      "Custom reset replaced the default airspeed");
 }
 
-void TestCaptureCurrentStateCanRestart() {
+void TestCaptureCurrentStateCanReset() {
   sim::Simulation simulation;
   StartSimulation(simulation);
-  Require(simulation.Update(), "Update before capture failed");
+  Require(simulation.Tick(), "Tick before capture failed");
 
-  const sim::InitialCondition captured = simulation.CaptureCurrentCondition();
-  Require(simulation.Restart(captured), "Restart with captured state failed");
-  const sim::InitialCondition restored = simulation.CaptureCurrentCondition();
+  const sim::InitialCondition captured = simulation.GetCurrentCondition();
+  Require(simulation.Reset(captured), "Reset with captured state failed");
+  const sim::InitialCondition restored = simulation.GetCurrentCondition();
 
   RequireNear(restored.altitudeFt,
       captured.altitudeFt,
       AltitudeToleranceFt,
-      "Captured restart altitude mismatch");
+      "Captured reset altitude mismatch");
   RequireNear(restored.headingDeg,
       captured.headingDeg,
       HeadingToleranceDeg,
-      "Captured restart heading mismatch");
+      "Captured reset heading mismatch");
   RequireNear(restored.airspeedKts,
       captured.airspeedKts,
       AirspeedToleranceKts,
-      "Captured restart airspeed mismatch");
+      "Captured reset airspeed mismatch");
 }
 
 void TestEngineStateInspection() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   const auto &aircraft = simulation.GetAircraft();
-  const std::size_t engineCount = aircraft.GetEngineCount();
+  const auto &engines = aircraft.GetEngines();
+  const std::size_t engineCount = engines.GetEngineCount();
 
   Require(engineCount >= 1, "Expected at least one engine");
 
-  const sim::EngineState engineState = aircraft.GetEngineState(0);
+  const sim::EngineState engineState = engines.GetEngineState(0);
 
   Require(engineState.index == 0, "Engine index mismatch");
   if (engineCount == 1) {
-    Require(engineState.running == aircraft.IsAnyEngineRunning(),
+    Require(engineState.running == engines.IsAnyEngineRunning(),
         "Single engine running state differs from aggregate query");
-    Require(engineState.running == aircraft.AreAllEnginesRunning(),
+    Require(engineState.running == engines.AreAllEnginesRunning(),
         "Single engine running state differs from all-engines query");
   }
   Require(std::isfinite(engineState.rpm), "Engine RPM is not finite");
@@ -200,7 +326,7 @@ void TestEngineStateInspection() {
       "Engine throttle command is not finite");
 
   const sim::EngineState invalidEngineState =
-      aircraft.GetEngineState(engineCount + 1);
+      engines.GetEngineState(engineCount + 1);
   Require(invalidEngineState.index == engineCount + 1,
       "Invalid engine index was not preserved");
 }
@@ -208,31 +334,35 @@ void TestEngineStateInspection() {
 void TestInvalidInitialConditionFails() {
   sim::Simulation simulation;
   StartSimulation(simulation);
-  sim::InitialCondition invalid = simulation.GetInitialCondition();
+  sim::InitialCondition invalid = simulation.GetDefaultInitialCondition();
   invalid.latitudeDeg = 100.0;
 
-  Require(!simulation.SetInitialCondition(invalid),
-      "Invalid latitude was accepted");
-  Require(simulation.GetLastError().has_value(),
+  std::string validationError;
+  Require(!sim::ValidateInitialCondition(invalid, &validationError),
+      "Standalone validation accepted invalid latitude");
+  Require(validationError
+              == "Latitude must be finite and between -90 and 90 degrees.",
+      "Standalone validation returned a different error");
+
+  Require(!simulation.Reset(invalid), "Invalid latitude was accepted");
+  Require(simulation.GetErrorTracker().GetLastError().has_value(),
       "Invalid IC did not report an error");
 }
 
-void TestStateProvider() {
+void TestAircraftStateAccess() {
   sim::Simulation simulation;
   StartSimulation(simulation);
-  const state::AircraftState state = simulation.GetStateProvider().GetState();
-  const sim::AircraftState aircraftState =
-      simulation.GetAircraft().GetAircraftState();
+  const sim::Aircraft &aircraft = simulation.GetAircraft();
+  const sim::AircraftState aircraftState = aircraft.GetAircraftState();
   const sim::AircraftStateDerivative derivative =
-      simulation.GetAircraft().GetAircraftStateDerivative();
-  const auto &properties = simulation.GetAircraft().GetProperties();
+      aircraft.GetAircraftStateDerivative();
+  const sim::InitialCondition currentCondition = aircraft.GetCurrentCondition();
+  const auto &properties = aircraft.GetProperties();
 
-  RequireNear(state.simTimeSec,
-      aircraftState.simulationTimeSec,
-      SimTimeTolerance,
-      "State provider simulation time mismatch");
-  Require(std::isfinite(state.altitudeM), "State provider altitude invalid");
-  Require(std::isfinite(state.airspeedMps), "State provider airspeed invalid");
+  Require(std::isfinite(currentCondition.altitudeFt),
+      "Aircraft altitude invalid");
+  Require(std::isfinite(aircraftState.trueAirspeedMps),
+      "Aircraft airspeed invalid");
   Require(std::isfinite(aircraftState.alphaDeg),
       "Aircraft state alpha invalid");
   Require(std::isfinite(aircraftState.betaDeg), "Aircraft state beta invalid");
@@ -280,8 +410,9 @@ void TestStartAppliesInitialTrim() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   const auto &aircraft = simulation.GetAircraft();
-  const control::ControlInput &input = aircraft.GetAircraftControlInput();
-  const double pitchTrim = aircraft.GetFlightControls().GetPitchTrim();
+  const auto &controls = aircraft.GetControls();
+  const control::ControlInput &input = controls.GetInput();
+  const double pitchTrim = controls.GetPitchTrim();
 
   Require(input.throttle > TrimInputTolerance,
       "Initial trim did not apply throttle command input");
@@ -296,23 +427,60 @@ void TestStartAppliesInitialTrim() {
 void TestInitialTrimIsStoredInAutopilot() {
   sim::Simulation simulation;
   StartSimulation(simulation);
-  const auto &autopilot = simulation.GetAutopilot();
+  const auto &autopilot = GetFlightControlManager(simulation).GetAutopilot();
   const gnc::TrimResult *trimResult = autopilot.GetTrimResult();
 
   Require(trimResult != nullptr, "Autopilot did not store initial trim result");
   Require(trimResult->success, "Autopilot stored a failed initial trim result");
 }
 
-void TestAircraftAxisSettersClampFinalInput() {
+void TestAutopilotControllerRegistry() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &autopilot = GetFlightControlManager(simulation).GetAutopilot();
+
+  Require(autopilot.GetController<gnc::RollHoldController>() != nullptr,
+      "Autopilot is missing RollHoldController");
+  Require(autopilot.GetController<gnc::PitchHoldController>() != nullptr,
+      "Autopilot is missing PitchHoldController");
+  Require(autopilot.GetController<gnc::AirspeedHoldController>() != nullptr,
+      "Autopilot is missing AirspeedHoldController");
+  Require(autopilot.GetController<gnc::CourseHoldController>() != nullptr,
+      "Autopilot is missing CourseHoldController");
+  Require(autopilot.GetController<gnc::AltitudeHoldController>() != nullptr,
+      "Autopilot is missing AltitudeHoldController");
+
+  const gnc::Autopilot &constAutopilot = autopilot;
+  Require(constAutopilot.GetController<gnc::RollHoldController>() != nullptr,
+      "Const controller lookup failed");
+
+  int resetCount = 0;
+  auto *controller =
+      autopilot.AddController<RegistryTestController>(resetCount);
+  Require(controller != nullptr, "Failed to add controller to Autopilot");
+  Require(autopilot.GetController<RegistryTestController>() == controller,
+      "Controller lookup did not return the registered controller");
+
+  autopilot.OnReset();
+  Require(resetCount == 1,
+      "Autopilot did not reset a registered controller generically");
+  Require(autopilot.RemoveController<RegistryTestController>(),
+      "Failed to remove controller from Autopilot");
+  Require(autopilot.GetController<RegistryTestController>() == nullptr,
+      "Removed controller is still registered");
+}
+
+void TestControlSystemAxisSettersClampFinalInput() {
   sim::Aircraft aircraft;
+  auto &controls = aircraft.GetControls();
 
-  Require(aircraft.SetElevatorInput(-2.0), "Elevator setter did not change");
-  Require(aircraft.SetAileronInput(2.0), "Aileron setter did not change");
-  Require(aircraft.SetRudderInput(3.0), "Rudder setter did not change");
-  Require(aircraft.SetThrottleInput(0.5), "Throttle setter did not change");
-  Require(aircraft.SetThrottleInput(-1.0), "Throttle setter did not change");
+  Require(controls.SetElevator(-2.0), "Elevator setter did not change");
+  Require(controls.SetAileron(2.0), "Aileron setter did not change");
+  Require(controls.SetRudder(3.0), "Rudder setter did not change");
+  Require(controls.SetThrottle(0.5), "Throttle setter did not change");
+  Require(controls.SetThrottle(-1.0), "Throttle setter did not change");
 
-  const control::ControlInput &input = aircraft.GetAircraftControlInput();
+  const control::ControlInput &input = controls.GetInput();
   RequireNear(input.elevator,
       -1.0,
       SimTimeTolerance,
@@ -331,17 +499,18 @@ void TestAircraftAxisSettersClampFinalInput() {
       "Throttle setter did not clamp lower bound");
 }
 
-void TestAircraftSetAircraftControlInputClampsFinalInput() {
+void TestControlSystemSetInputClampsFinalInput() {
   sim::Aircraft aircraft;
+  auto &controls = aircraft.GetControls();
 
-  aircraft.SetAircraftControlInput({
+  controls.SetInput({
       .elevator = -2.0,
       .aileron = 2.0,
       .rudder = 3.0,
       .throttle = 2.0,
   });
 
-  const control::ControlInput &input = aircraft.GetAircraftControlInput();
+  const control::ControlInput &input = controls.GetInput();
   RequireNear(input.elevator,
       -1.0,
       SimTimeTolerance,
@@ -364,9 +533,10 @@ void TestManualFlightControlControllerAppliesCommands() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   auto &aircraft = simulation.GetAircraft();
-  auto &manualController = simulation.GetManualFlightControlController();
+  auto &flightControlManager = GetFlightControlManager(simulation);
+  auto &manualController = flightControlManager.GetManualController();
 
-  simulation.SetFlightControlMode(control::FlightControlMode::Manual);
+  flightControlManager.SetMode(control::FlightControlMode::Manual);
   manualController.SetCommandedInput({
       .elevator = 0.25,
       .aileron = 2.0,
@@ -393,10 +563,9 @@ void TestManualFlightControlControllerAppliesCommands() {
       SimTimeTolerance,
       "Rudder command mismatch");
 
-  Require(simulation.Update(), "Manual flight control update failed");
+  Require(simulation.Tick(), "Manual flight control tick failed");
 
-  const control::ControlInput &actualInput =
-      aircraft.GetAircraftControlInput();
+  const control::ControlInput &actualInput = aircraft.GetControls().GetInput();
   RequireNear(actualInput.throttle,
       0.5,
       SimTimeTolerance,
@@ -415,14 +584,63 @@ void TestManualFlightControlControllerAppliesCommands() {
       "Rudder command was not applied");
 }
 
-void TestManualModeIgnoresAutopilotController() {
+void TestFlightControlManagerOwnsAndRoutesControllers() {
+  const control::ControlInput manualInput{
+      .elevator = 0.1,
+      .aileron = 0.2,
+      .rudder = 0.3,
+      .throttle = 0.4,
+  };
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &manager = GetFlightControlManager(simulation);
+  const auto &aircraft = simulation.GetAircraft();
+
+  manager.GetManualController().SetCommandedInput(manualInput);
+  Require(simulation.Tick(), "Manual manager routing tick failed");
+  Require(aircraft.GetControls().GetInput() == manualInput,
+      "Manager did not route its manual controller output");
+
+  manager.SetMode(control::FlightControlMode::Autopilot);
+  Require(simulation.Tick(), "Autopilot manager routing tick failed");
+  Require(aircraft.GetControls().GetInput() == manualInput,
+      "Autopilot did not preserve manual pass-through output");
+}
+
+void TestFlightControlManagerNoInputPreservesCommand() {
+  const control::ControlInput retainedInput{
+      .elevator = 0.1,
+      .aileron = -0.2,
+      .rudder = 0.3,
+      .throttle = 0.4,
+  };
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &manager = GetFlightControlManager(simulation);
+  auto &controls = simulation.GetAircraft().GetControls();
+
+  controls.SetInput(retainedInput);
+  manager.SetMode(control::FlightControlMode::None);
+  Require(simulation.Tick(), "No-input manager tick failed");
+  Require(controls.GetInput() == retainedInput,
+      "No-input mode replaced the existing control command");
+
+  manager.GetManualController().SetCommandedInput({});
+  manager.SetMode(control::FlightControlMode::Manual);
+  Require(simulation.Tick(), "Explicit-zero manager tick failed");
+  Require(controls.GetInput() == control::ControlInput{},
+      "Explicit zero command was treated as no control update");
+}
+
+void TestManualModeIgnoresAutopilotSource() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   auto &aircraft = simulation.GetAircraft();
-  auto &manualController = simulation.GetManualFlightControlController();
-  auto &autopilot = simulation.GetAutopilot();
+  auto &flightControlManager = GetFlightControlManager(simulation);
+  auto &manualController = flightControlManager.GetManualController();
+  auto &autopilot = flightControlManager.GetAutopilot();
 
-  simulation.SetFlightControlMode(control::FlightControlMode::Manual);
+  flightControlManager.SetMode(control::FlightControlMode::Manual);
   manualController.SetCommandedInput({
       .elevator = 0.2,
       .aileron = -0.8,
@@ -438,9 +656,9 @@ void TestManualModeIgnoresAutopilotController() {
   });
   autopilot.SetRollHoldEnabled(true);
 
-  Require(simulation.Update(), "Manual mode update failed");
+  Require(simulation.Tick(), "Manual mode tick failed");
 
-  const control::ControlInput &actualInput = aircraft.GetAircraftControlInput();
+  const control::ControlInput &actualInput = aircraft.GetControls().GetInput();
   RequireNear(actualInput.elevator,
       0.2,
       SimTimeTolerance,
@@ -463,23 +681,26 @@ void TestRollHoldControllerComputesAileronCommand() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   auto &aircraft = simulation.GetAircraft();
-  auto &rollHold = simulation.GetAutopilot().GetRollHoldController();
+  auto *rollHold = GetFlightControlManager(simulation)
+                       .GetAutopilot()
+                       .GetController<gnc::RollHoldController>();
+  Require(rollHold != nullptr, "Autopilot is missing RollHoldController");
 
-  rollHold.SetEnabled(false);
-  Require(!rollHold.Update(aircraft, simulation.GetTickSizeSec()).has_value(),
+  rollHold->SetEnabled(false);
+  Require(!rollHold->OnTick(aircraft, MakeTestTick(simulation)).has_value(),
       "Disabled roll hold should not produce aileron command");
 
   const auto &properties = aircraft.GetProperties();
   const double targetRollRad = properties.Roll().Rad() + 0.2;
-  rollHold.SetTrimAileron(0.1);
-  rollHold.SetSettings({
+  rollHold->SetTrimAileron(0.1);
+  rollHold->SetSettings({
       .targetRollRad = targetRollRad,
       .proportionalGain = 0.5,
       .derivativeGain = 0.25,
   });
-  rollHold.SetEnabled(true);
+  rollHold->SetEnabled(true);
 
-  const auto command = rollHold.Update(aircraft, simulation.GetTickSizeSec());
+  const auto command = rollHold->OnTick(aircraft, MakeTestTick(simulation));
   Require(command.has_value(), "Enabled roll hold produced no command");
 
   const double expectedAileron =
@@ -495,23 +716,26 @@ void TestPitchHoldControllerComputesElevatorCommand() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   auto &aircraft = simulation.GetAircraft();
-  auto &pitchHold = simulation.GetAutopilot().GetPitchHoldController();
+  auto *pitchHold = GetFlightControlManager(simulation)
+                        .GetAutopilot()
+                        .GetController<gnc::PitchHoldController>();
+  Require(pitchHold != nullptr, "Autopilot is missing PitchHoldController");
 
-  pitchHold.SetEnabled(false);
-  Require(!pitchHold.Update(aircraft, simulation.GetTickSizeSec()).has_value(),
+  pitchHold->SetEnabled(false);
+  Require(!pitchHold->OnTick(aircraft, MakeTestTick(simulation)).has_value(),
       "Disabled pitch hold should not produce elevator command");
 
   const auto &properties = aircraft.GetProperties();
   const double targetPitchRad = properties.Pitch().Rad() + 0.2;
-  pitchHold.SetTrimElevator(0.1);
-  pitchHold.SetSettings({
+  pitchHold->SetTrimElevator(0.1);
+  pitchHold->SetSettings({
       .targetPitchRad = targetPitchRad,
       .proportionalGain = 0.5,
       .derivativeGain = 0.25,
   });
-  pitchHold.SetEnabled(true);
+  pitchHold->SetEnabled(true);
 
-  const auto command = pitchHold.Update(aircraft, simulation.GetTickSizeSec());
+  const auto command = pitchHold->OnTick(aircraft, MakeTestTick(simulation));
   Require(command.has_value(), "Enabled pitch hold produced no command");
 
   const double expectedElevator =
@@ -523,12 +747,13 @@ void TestPitchHoldControllerComputesElevatorCommand() {
       "Pitch hold elevator command mismatch");
 }
 
-void TestAutopilotModeAppliesAutopilotControllerOutput() {
+void TestAutopilotModeAppliesAutopilotSourceOutput() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   auto &aircraft = simulation.GetAircraft();
-  auto &manualController = simulation.GetManualFlightControlController();
-  auto &autopilot = simulation.GetAutopilot();
+  auto &flightControlManager = GetFlightControlManager(simulation);
+  auto &manualController = flightControlManager.GetManualController();
+  auto &autopilot = flightControlManager.GetAutopilot();
   const gnc::TrimResult *trimResult = autopilot.GetTrimResult();
 
   Require(trimResult != nullptr, "Autopilot mode test has no stored trim");
@@ -555,20 +780,18 @@ void TestAutopilotModeAppliesAutopilotControllerOutput() {
       .derivativeGain = 0.0,
   });
   autopilot.SetPitchHoldEnabled(true);
-  simulation.SetFlightControlMode(control::FlightControlMode::Autopilot);
+  flightControlManager.SetMode(control::FlightControlMode::Autopilot);
 
-  const double expectedElevator =
-      control::ClampControlAxisValue(control::ControlAxis::Elevator,
-          trimResult->elevator
-              - 0.5 * (pitchTargetRad - properties.Pitch().Rad()));
-  const double expectedAileron =
-      control::ClampControlAxisValue(control::ControlAxis::Aileron,
-          trimResult->aileron
-              + 0.5 * (rollTargetRad - properties.Roll().Rad()));
+  const double expectedElevator = control::ClampControlAxisValue(
+      control::ControlAxis::Elevator,
+      trimResult->elevator - 0.5 * (pitchTargetRad - properties.Pitch().Rad()));
+  const double expectedAileron = control::ClampControlAxisValue(
+      control::ControlAxis::Aileron,
+      trimResult->aileron + 0.5 * (rollTargetRad - properties.Roll().Rad()));
 
-  Require(simulation.Update(), "Autopilot mode update failed");
+  Require(simulation.Tick(), "Autopilot mode tick failed");
 
-  const control::ControlInput &actualInput = aircraft.GetAircraftControlInput();
+  const control::ControlInput &actualInput = aircraft.GetControls().GetInput();
   RequireNear(actualInput.elevator,
       expectedElevator,
       SimTimeTolerance,
@@ -591,8 +814,9 @@ void TestPitchHoldOnlyPassesThroughManualLateralAxes() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   auto &aircraft = simulation.GetAircraft();
-  auto &manualController = simulation.GetManualFlightControlController();
-  auto &autopilot = simulation.GetAutopilot();
+  auto &flightControlManager = GetFlightControlManager(simulation);
+  auto &manualController = flightControlManager.GetManualController();
+  auto &autopilot = flightControlManager.GetAutopilot();
   const gnc::TrimResult *trimResult = autopilot.GetTrimResult();
 
   Require(trimResult != nullptr, "Pitch hold pass-through test has no trim");
@@ -613,16 +837,15 @@ void TestPitchHoldOnlyPassesThroughManualLateralAxes() {
   });
   autopilot.SetPitchHoldEnabled(true);
   autopilot.SetRollHoldEnabled(false);
-  simulation.SetFlightControlMode(control::FlightControlMode::Autopilot);
+  flightControlManager.SetMode(control::FlightControlMode::Autopilot);
 
-  const double expectedElevator =
-      control::ClampControlAxisValue(control::ControlAxis::Elevator,
-          trimResult->elevator
-              - 0.5 * (pitchTargetRad - properties.Pitch().Rad()));
+  const double expectedElevator = control::ClampControlAxisValue(
+      control::ControlAxis::Elevator,
+      trimResult->elevator - 0.5 * (pitchTargetRad - properties.Pitch().Rad()));
 
-  Require(simulation.Update(), "Pitch hold pass-through update failed");
+  Require(simulation.Tick(), "Pitch hold pass-through tick failed");
 
-  const control::ControlInput &actualInput = aircraft.GetAircraftControlInput();
+  const control::ControlInput &actualInput = aircraft.GetControls().GetInput();
   RequireNear(actualInput.elevator,
       expectedElevator,
       SimTimeTolerance,
@@ -645,8 +868,9 @@ void TestRollHoldOnlyPassesThroughManualLongitudinalAxes() {
   sim::Simulation simulation;
   StartSimulation(simulation);
   auto &aircraft = simulation.GetAircraft();
-  auto &manualController = simulation.GetManualFlightControlController();
-  auto &autopilot = simulation.GetAutopilot();
+  auto &flightControlManager = GetFlightControlManager(simulation);
+  auto &manualController = flightControlManager.GetManualController();
+  auto &autopilot = flightControlManager.GetAutopilot();
   const gnc::TrimResult *trimResult = autopilot.GetTrimResult();
 
   Require(trimResult != nullptr, "Roll hold pass-through test has no trim");
@@ -667,16 +891,15 @@ void TestRollHoldOnlyPassesThroughManualLongitudinalAxes() {
   });
   autopilot.SetRollHoldEnabled(true);
   autopilot.SetPitchHoldEnabled(false);
-  simulation.SetFlightControlMode(control::FlightControlMode::Autopilot);
+  flightControlManager.SetMode(control::FlightControlMode::Autopilot);
 
-  const double expectedAileron =
-      control::ClampControlAxisValue(control::ControlAxis::Aileron,
-          trimResult->aileron
-              + 0.5 * (rollTargetRad - properties.Roll().Rad()));
+  const double expectedAileron = control::ClampControlAxisValue(
+      control::ControlAxis::Aileron,
+      trimResult->aileron + 0.5 * (rollTargetRad - properties.Roll().Rad()));
 
-  Require(simulation.Update(), "Roll hold pass-through update failed");
+  Require(simulation.Tick(), "Roll hold pass-through tick failed");
 
-  const control::ControlInput &actualInput = aircraft.GetAircraftControlInput();
+  const control::ControlInput &actualInput = aircraft.GetControls().GetInput();
   RequireNear(actualInput.elevator,
       0.2,
       SimTimeTolerance,
@@ -698,24 +921,27 @@ void TestRollHoldOnlyPassesThroughManualLongitudinalAxes() {
 
 int main() {
   try {
-    TestPauseStopsTime();
-    TestStepOnceAdvancesOneTick();
-    TestResumeAdvancesTime();
-    TestRestartUsesStoredInitialCondition();
-    TestRestartWithInitialCondition();
-    TestCaptureCurrentStateCanRestart();
+    TestErrorTrackerOwnsErrorState();
+    TestSimulationComponentLifecycle();
+    TestTickAdvancesOneStep();
+    TestResetUsesDefaultInitialCondition();
+    TestResetWithInitialCondition();
+    TestCaptureCurrentStateCanReset();
     TestEngineStateInspection();
     TestInvalidInitialConditionFails();
-    TestStateProvider();
+    TestAircraftStateAccess();
     TestStartAppliesInitialTrim();
     TestInitialTrimIsStoredInAutopilot();
-    TestAircraftAxisSettersClampFinalInput();
-    TestAircraftSetAircraftControlInputClampsFinalInput();
+    TestAutopilotControllerRegistry();
+    TestControlSystemAxisSettersClampFinalInput();
+    TestControlSystemSetInputClampsFinalInput();
     TestManualFlightControlControllerAppliesCommands();
-    TestManualModeIgnoresAutopilotController();
+    TestFlightControlManagerOwnsAndRoutesControllers();
+    TestFlightControlManagerNoInputPreservesCommand();
+    TestManualModeIgnoresAutopilotSource();
     TestRollHoldControllerComputesAileronCommand();
     TestPitchHoldControllerComputesElevatorCommand();
-    TestAutopilotModeAppliesAutopilotControllerOutput();
+    TestAutopilotModeAppliesAutopilotSourceOutput();
     TestPitchHoldOnlyPassesThroughManualLateralAxes();
     TestRollHoldOnlyPassesThroughManualLongitudinalAxes();
   } catch (const std::exception &e) {

@@ -62,7 +62,7 @@ FlightDataMonitorWindow::FlightDataMonitorWindow()
       qDotDegPerSec2History_(VisiblePlotSampleCount),
       rDotDegPerSec2History_(VisiblePlotSampleCount) {}
 
-void FlightDataMonitorWindow::OnUpdate(gui::GUI &gui) {
+void FlightDataMonitorWindow::OnRender(gui::GUI &gui) {
   auto &sim = gui.GetSimulation();
   OnRecordSamples(sim);
   DrawWindow(sim);

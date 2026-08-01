@@ -19,9 +19,9 @@ constexpr float LayoutSpacing = 8.0F;
 
 SimulationWindow::SimulationWindow() : Window("Simulation") {}
 
-void SimulationWindow::OnUpdate(gui::GUI &gui) {
+void SimulationWindow::OnRender(gui::GUI &gui) {
   if (!initialConditionLoaded_) {
-    initialCondition_ = gui.GetSimulation().GetInitialCondition();
+    initialCondition_ = gui.GetSimulation().GetDefaultInitialCondition();
     initialConditionLoaded_ = true;
   }
 
@@ -46,6 +46,7 @@ void SimulationWindow::DrawInitialConditionTab(gui::GUI &gui) {
 
 void SimulationWindow::DrawRuntimeTab(gui::GUI &gui) {
   auto &simulation = gui.GetSimulation();
+  const auto &executionControl = gui.GetSimulationExecutionControl();
   const sim::AircraftState aircraftState =
       simulation.GetAircraft().GetAircraftState();
 
@@ -56,14 +57,16 @@ void SimulationWindow::DrawRuntimeTab(gui::GUI &gui) {
                              aircraftState.simulationTimeSec,
                              "%.2f s")
                          + UI::Text(std::string("State: ")
-                                    + sim::ToString(simulation.GetState()))
+                                    + application::ToString(executionControl
+                                            .GetSimulationExecutionState()))
                          + UI::ValueLabel("Tick Size",
                              simulation.GetTickSizeSec(),
                              "%.6f s")
-                         + UI::ValueLabel("Pending Steps",
-                             static_cast<int>(simulation.GetPendingStepCount()),
+                         + UI::ValueLabel("Pending Ticks",
+                             static_cast<int>(executionControl
+                                     .GetPendingSimulationTickCount()),
                              "%d")
-                         + BuildRuntimeActions(simulation) + DrawLastError(gui)]
+                         + BuildRuntimeActions(gui) + DrawLastError(gui)]
       .Render();
 }
 
@@ -73,7 +76,8 @@ void SimulationWindow::DrawEnvironmentTab() {
 }
 
 void SimulationWindow::DrawAircraftTab(gui::GUI &gui) {
-  const auto engineStates = gui.GetSimulation().GetAircraft().GetEngineStates();
+  const auto engineStates =
+      gui.GetSimulation().GetAircraft().GetEngines().GetEngineStates();
 
   UI::VerticalLayoutBuilder layout = UI::VerticalLayout().Spacing(LayoutSpacing)
                                      + UI::Heading("Aircraft")
@@ -146,39 +150,68 @@ UI::UIElement SimulationWindow::DrawInitialConditionFields() {
 
 UI::UIElement SimulationWindow::DrawInitialConditionActions(gui::GUI &gui) {
   auto &simulation = gui.GetSimulation();
+  auto &executionControl = gui.GetSimulationExecutionControl();
 
-  return UI::HorizontalLayout().Spacing(
-      LayoutSpacing)[+UI::Button("Apply").OnAction([this, &simulation] {
-    simulation.SetInitialCondition(initialCondition_);
-  }) + UI::Button("Restart With IC").OnAction([this, &simulation] {
-    simulation.Restart(initialCondition_);
-  }) + UI::Button("Use Current State").OnAction([this, &simulation] {
-    initialCondition_ = simulation.CaptureCurrentCondition();
-  }) + UI::Button("Reset Default").OnAction([this, &simulation] {
-    initialCondition_ = simulation.GetDefaultInitialCondition();
-    simulation.ClearLastError();
-  })];
+  return UI::HorizontalLayout().Spacing(LayoutSpacing)
+      [+UI::Button("Reset With IC")
+              .OnAction([this, &simulation, &executionControl] {
+                const bool resumeAfterReset =
+                    executionControl.GetSimulationExecutionState()
+                    == application::SimulationExecutionState::Running;
+                executionControl.PauseSimulation();
+                if (executionControl.ResetSimulation(initialCondition_)
+                    && resumeAfterReset) {
+                  executionControl.ResumeSimulation();
+                }
+              })
+          + UI::Button("Use Current State").OnAction([this, &simulation] {
+              initialCondition_ = simulation.GetCurrentCondition();
+            })
+          + UI::Button("Reset Default").OnAction([this, &simulation] {
+              initialCondition_ = simulation.GetDefaultInitialCondition();
+              simulation.GetErrorTracker().ClearError();
+            })];
 }
 
-UI::UIElement SimulationWindow::BuildRuntimeActions(
-    sim::Simulation &simulation) {
-  return UI::HorizontalLayout().Spacing(
-      LayoutSpacing)[+UI::Button("Pause")
-                         .Enabled(simulation.IsRunning())
-                         .OnAction([&simulation] { simulation.Pause(); })
-                     + UI::Button("Resume")
-                         .Enabled(simulation.IsPaused())
-                         .OnAction([&simulation] { simulation.Resume(); })
-                     + UI::Button("Step Once")
-                         .Enabled(simulation.IsPaused())
-                         .OnAction([&simulation] { simulation.RequestStep(); })
-                     + UI::Button("Restart")
-                         .Enabled(!simulation.IsStopped())
-                         .OnAction([&simulation] { simulation.Restart(); })];
+UI::UIElement SimulationWindow::BuildRuntimeActions(gui::GUI &gui) {
+  auto &simulation = gui.GetSimulation();
+  auto &executionControl = gui.GetSimulationExecutionControl();
+  const application::SimulationExecutionState executionState =
+      executionControl.GetSimulationExecutionState();
+
+  return UI::HorizontalLayout().Spacing(LayoutSpacing)
+      [+UI::Button("Pause")
+              .Enabled(executionState
+                       == application::SimulationExecutionState::Running)
+              .OnAction(
+                  [&executionControl] { executionControl.PauseSimulation(); })
+          + UI::Button("Resume")
+              .Enabled(executionState
+                       == application::SimulationExecutionState::Paused)
+              .OnAction(
+                  [&executionControl] { executionControl.ResumeSimulation(); })
+          + UI::Button("Tick Once")
+              .Enabled(executionState
+                       == application::SimulationExecutionState::Paused)
+              .OnAction([&executionControl] {
+                executionControl.RequestSimulationTick();
+              })
+          + UI::Button("Reset")
+              .Enabled(executionState
+                       != application::SimulationExecutionState::Stopped)
+              .OnAction([&simulation, &executionControl, executionState] {
+                const bool resumeAfterReset =
+                    executionState
+                    == application::SimulationExecutionState::Running;
+                executionControl.PauseSimulation();
+                if (executionControl.ResetSimulation() && resumeAfterReset) {
+                  executionControl.ResumeSimulation();
+                }
+              })];
 }
 
 UI::UIElement SimulationWindow::DrawLastError(gui::GUI &gui) const {
-  const auto &lastError = gui.GetSimulation().GetLastError();
+  const auto &lastError = gui.GetSimulation().GetErrorTracker().GetLastError();
   if (!lastError.has_value()) {
     return {};
   }

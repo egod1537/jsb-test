@@ -1,16 +1,10 @@
 #include "application/sim/gnc/hold/RollHoldController.hpp"
 
 #include "application/sim/Aircraft.hpp"
-#include "application/sim/Context.hpp"
 #include "application/sim/Tick.hpp"
 
 namespace gnc {
 void RollHoldController::Reset() {}
-
-bool RollHoldController::Reset(sim::Context &) {
-  Reset();
-  return true;
-}
 
 bool RollHoldController::IsEnabled() const { return enabled_; }
 
@@ -30,8 +24,8 @@ void RollHoldController::SetTrimAileron(double trimAileron) {
   trimAileron_ = trimAileron;
 }
 
-std::optional<double> RollHoldController::Update(
-    const sim::Aircraft &aircraft, double) {
+std::optional<double> RollHoldController::OnTick(const sim::Aircraft &aircraft,
+    const sim::Tick &) {
   if (!enabled_) {
     return std::nullopt;
   }
@@ -46,7 +40,4 @@ std::optional<double> RollHoldController::Update(
   return newAileron;
 }
 
-bool RollHoldController::PreStep(sim::Context &, const sim::Tick &) {
-  return true;
-}
 } // namespace gnc

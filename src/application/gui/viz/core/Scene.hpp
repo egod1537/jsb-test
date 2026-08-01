@@ -12,7 +12,7 @@ public:
   GameObject &CreateGameObject(std::string name);
   void Clear();
 
-  void Update(const FrameSnapshot &snapshot);
+  void Tick(const FrameSnapshot &snapshot);
   void Render(RenderContext &context) const;
 
 private:

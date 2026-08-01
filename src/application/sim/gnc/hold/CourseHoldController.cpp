@@ -3,11 +3,6 @@
 namespace gnc {
 void CourseHoldController::Reset() {}
 
-bool CourseHoldController::Reset(sim::Context &) {
-  Reset();
-  return true;
-}
-
 bool CourseHoldController::IsEnabled() const { return enabled_; }
 
 void CourseHoldController::SetEnabled(bool enabled) { enabled_ = enabled; }
@@ -26,7 +21,4 @@ void CourseHoldController::SetTrimAileron(double trimAileron) {
   trimAileron_ = trimAileron;
 }
 
-bool CourseHoldController::PreStep(sim::Context &, const sim::Tick &) {
-  return true;
-}
 } // namespace gnc

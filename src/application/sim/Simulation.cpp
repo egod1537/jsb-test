@@ -1,26 +1,10 @@
 #include "application/sim/Simulation.hpp"
-#include "application/sim/Context.hpp"
 #include "application/sim/SimulationConfig.h"
-#include "application/sim/state/TrueStateProvider.hpp"
-#include <FGFDMExec.h>
+#include "application/sim/StateLogger.hpp"
 #include <cmath>
 #include <iostream>
-#include <utility>
 
 namespace {
-constexpr double LOG_INTERVAL_SEC = 1.0;
-
-sim::InitialCondition InitialConditionFromConfig(
-    const sim::SimulationConfig &config) {
-  sim::InitialCondition initialCondition{};
-  initialCondition.altitudeFt = config.altitudeFt;
-  initialCondition.rollDeg = config.rollDeg;
-  initialCondition.pitchDeg = config.pitchDeg;
-  initialCondition.headingDeg = config.headingDeg;
-  initialCondition.airspeedKts = config.calibratedAirspeedKts;
-  return initialCondition;
-}
-
 double NormalizeHeadingDeg(double headingDeg) {
   double normalized = std::fmod(headingDeg, 360.0);
   if (normalized < 0.0) {
@@ -40,450 +24,301 @@ gnc::TrimRequest TrimRequestFromInitialCondition(
   return request;
 }
 
-void SetManualControlFromTrimResult(
-    control::ManualFlightControlController &manualController,
-    const gnc::TrimResult &trimResult) {
-  manualController.SetCommandedInput({
-      .elevator = trimResult.elevator,
-      .aileron = trimResult.aileron,
-      .rudder = trimResult.rudder,
-      .throttle = trimResult.throttle,
-  });
-}
 } // namespace
 
 namespace sim {
-const char *ToString(SimulationState state) {
-  switch (state) {
-  case SimulationState::Running:
-    return "Running";
-  case SimulationState::Paused:
-    return "Paused";
-  case SimulationState::Stopped:
-    return "Stopped";
-  }
-
-  return "Unknown";
-}
-
 // public
-Simulation::Simulation()
-    : stateProvider_(std::make_unique<state::TrueStateProvider>(aircraft_)),
-      autopilotControlController_(autopilot_, manualControlController_) {
-  keyboard_.SetManualFlightControlController(manualControlController_);
-  RegisterSystems();
+Simulation::Simulation() {
+  AddComponent<control::FlightControlManager>();
+  AddComponent<StateLogger>();
 }
 
 Simulation::~Simulation() = default;
 
-bool Simulation::Start(const SimulationConfig &config) {
-  if (started_) {
+bool Simulation::Initialize(const SimulationConfig &config) {
+  if (initialized_) {
     return true;
   }
 
   config_ = config;
-  defaultInitialCondition_ = InitialConditionFromConfig(config_);
-  initialCondition_ = defaultInitialCondition_;
-  ResetLogTimer();
-  pendingSteps_ = 0;
+  defaultInitialCondition_ = InitialCondition{};
   tickIndex_ = 0;
-  lastError_.reset();
-  flightControlMode_ = control::FlightControlMode::Manual;
-  manualControlController_.Reset();
-  autopilotControlController_.Reset();
+  errorTracker_.ClearError();
 
-  if (!aircraft_.Initialize(config_)) {
-    SetError("Failed to initialize aircraft.");
-    state_ = SimulationState::Stopped;
+  auto *flightControlManager = GetComponent<control::FlightControlManager>();
+  if (flightControlManager == nullptr) {
+    errorTracker_.SetError("Flight control component is missing.");
+    return false;
+  }
+  flightControlManager->ResetControllers();
+
+  if (!aircraft_.Initialize(config_, defaultInitialCondition_)) {
+    errorTracker_.SetError("Failed to initialize aircraft.");
     return false;
   }
 
-  if (!ApplyInitialTrim(initialCondition_)) {
-    state_ = SimulationState::Stopped;
+  if (!ApplyInitialTrim(defaultInitialCondition_)) {
     return false;
   }
 
-  if (!InitializeSystems()) {
-    if (!lastError_.has_value()) {
-      SetError("Failed to initialize simulation systems.");
-    }
-    ShutdownSystems();
-    state_ = SimulationState::Stopped;
+  if (!InitializeComponents()) {
+    errorTracker_.SetErrorIfEmpty("Failed to initialize components.");
+    ShutdownComponents();
     return false;
   }
 
-  started_ = true;
-  state_ = SimulationState::Running;
+  initialized_ = true;
   return true;
 }
 
-bool Simulation::Update() {
-  if (!started_) {
+bool Simulation::Tick() {
+  if (!initialized_) {
     return false;
   }
 
-  if (state_ == SimulationState::Paused && pendingSteps_ == 0) {
-    return true;
+  return ProcessTick();
+}
+
+void Simulation::Shutdown() {
+  if (initialized_) {
+    ShutdownComponents();
   }
 
-  const bool shouldStep =
-      state_ == SimulationState::Running
-      || (state_ == SimulationState::Paused && pendingSteps_ > 0);
-  if (!shouldStep) {
-    return true;
-  }
+  initialized_ = false;
+}
 
-  if (!AdvanceOneTick()) {
+const SimulationConfig &Simulation::GetConfig() const { return config_; }
+
+double Simulation::GetTickSizeSec() const { return config_.GetDT(); }
+
+bool Simulation::Reset() { return Reset(defaultInitialCondition_); }
+
+bool Simulation::Reset(const InitialCondition &initialCondition) {
+  if (!initialized_) {
+    errorTracker_.SetError("Simulation has not been initialized.");
     return false;
   }
 
-  if (state_ == SimulationState::Paused && pendingSteps_ > 0) {
-    --pendingSteps_;
-  }
-
-  return true;
-}
-
-void Simulation::Exit() {
-  if (started_) {
-    ShutdownSystems();
-  }
-
-  started_ = false;
-  pendingSteps_ = 0;
-  state_ = SimulationState::Stopped;
-}
-
-bool Simulation::Initialize(const SimulationConfig &config) {
-  return Start(config);
-}
-
-void Simulation::Pause() {
-  if (state_ == SimulationState::Running) {
-    state_ = SimulationState::Paused;
-  }
-}
-
-void Simulation::Resume() {
-  if (state_ == SimulationState::Paused) {
-    pendingSteps_ = 0;
-    state_ = SimulationState::Running;
-  }
-}
-
-void Simulation::TogglePause() {
-  if (IsRunning()) {
-    Pause();
-  } else if (IsPaused()) {
-    Resume();
-  }
-}
-
-bool Simulation::RequestStep() {
-  if (!IsPaused()) {
-    return false;
-  }
-
-  ++pendingSteps_;
-  return true;
-}
-
-bool Simulation::StepOnce() {
-  if (!started_ || !IsPaused()) {
-    return false;
-  }
-
-  return AdvanceOneTick();
-}
-
-bool Simulation::SetInitialCondition(const InitialCondition &initialCondition) {
   InitialCondition normalized = initialCondition;
   normalized.headingDeg = NormalizeHeadingDeg(normalized.headingDeg);
 
-  if (!ValidateInitialCondition(normalized)) {
+  std::string validationError;
+  if (!ValidateInitialCondition(normalized, &validationError)) {
+    errorTracker_.SetError(validationError);
     return false;
   }
 
-  initialCondition_ = normalized;
-  lastError_.reset();
-  return true;
-}
-
-bool Simulation::Restart() { return Restart(initialCondition_); }
-
-bool Simulation::Restart(const InitialCondition &initialCondition) {
-  if (!started_) {
-    SetError("Simulation has not been started.");
+  auto *flightControlManager = GetComponent<control::FlightControlManager>();
+  if (flightControlManager == nullptr) {
+    errorTracker_.SetError("Flight control component is missing.");
     return false;
   }
 
-  const SimulationState previousState = state_;
-  pendingSteps_ = 0;
-
-  if (!SetInitialCondition(initialCondition)) {
-    state_ = SimulationState::Paused;
+  if (!aircraft_.Reset(config_, normalized)) {
+    errorTracker_.SetError(
+        "Failed to reset aircraft with the requested initial condition.");
     return false;
   }
 
-  if (!aircraft_.Reset(config_, initialCondition_)) {
-    SetError(
-        "Failed to restart aircraft with the requested initial condition.");
-    state_ = SimulationState::Paused;
+  flightControlManager->ResetControllers();
+
+  if (!ApplyInitialTrim(normalized)) {
     return false;
   }
 
-  flightControlMode_ = control::FlightControlMode::Manual;
-  manualControlController_.Reset();
-  autopilotControlController_.Reset();
-
-  if (!ApplyInitialTrim(initialCondition_)) {
-    state_ = SimulationState::Paused;
-    return false;
-  }
-
-  ResetLogTimer();
   tickIndex_ = 0;
 
-  if (!ResetSystems()) {
-    if (!lastError_.has_value()) {
-      SetError("Failed to reset simulation systems.");
-    }
-    state_ = SimulationState::Paused;
+  if (!ResetComponents()) {
+    errorTracker_.SetErrorIfEmpty("Failed to reset components.");
     return false;
   }
 
-  state_ = previousState == SimulationState::Paused ? SimulationState::Paused
-                                                    : SimulationState::Running;
-  lastError_.reset();
+  errorTracker_.ClearError();
   return true;
 }
 
-InitialCondition Simulation::CaptureCurrentCondition() const {
-  return aircraft_.CaptureCurrentCondition();
+InitialCondition Simulation::GetCurrentCondition() const {
+  return aircraft_.GetCurrentCondition();
+}
+
+const InitialCondition &Simulation::GetDefaultInitialCondition() const {
+  return defaultInitialCondition_;
 }
 
 Aircraft &Simulation::GetAircraft() { return aircraft_; }
 
 const Aircraft &Simulation::GetAircraft() const { return aircraft_; }
 
-control::FlightControlMode Simulation::GetFlightControlMode() const {
-  return flightControlMode_;
+ErrorTracker &Simulation::GetErrorTracker() { return errorTracker_; }
+
+const ErrorTracker &Simulation::GetErrorTracker() const {
+  return errorTracker_;
 }
 
-void Simulation::SetFlightControlMode(control::FlightControlMode mode) {
-  flightControlMode_ = mode;
-}
+bool Simulation::ProcessTick() {
+  const sim::Tick tick = MakeTick();
 
-control::ManualFlightControlController &
-Simulation::GetManualFlightControlController() {
-  return manualControlController_;
-}
-
-const control::ManualFlightControlController &
-Simulation::GetManualFlightControlController() const {
-  return manualControlController_;
-}
-
-gnc::Autopilot &Simulation::GetAutopilot() { return autopilot_; }
-
-const gnc::Autopilot &Simulation::GetAutopilot() const {
-  return autopilot_;
-}
-
-const state::IStateProvider &Simulation::GetStateProvider() const {
-  return *stateProvider_;
-}
-
-bool Simulation::AdvanceOneTick() {
-  const Tick preStepTick = MakeTick();
-  if (!RunPreStepSystems(preStepTick)) {
-    if (!lastError_.has_value()) {
-      SetError("Simulation pre-step system failed.");
-    }
+  if (!RunPreTickComponents(tick)) {
+    errorTracker_.SetErrorIfEmpty("Simulation pre-tick component failed.");
     return false;
   }
 
-  control::FlightControlController *flightControlController =
-      &manualControlController_;
-  if (flightControlMode_ == control::FlightControlMode::Autopilot) {
-    flightControlController = &autopilotControlController_;
-  }
-
-  aircraft_.SetAircraftControlInput(
-      flightControlController->Update(aircraft_, preStepTick.dtSec));
-
-  if (!aircraft_.Step()) {
-    SetError("JSBSim simulation stopped.");
-    std::cerr << *lastError_ << '\n';
+  auto *flightControlManager = GetComponent<control::FlightControlManager>();
+  if (flightControlManager == nullptr) {
+    errorTracker_.SetError("Flight control component is missing.");
     return false;
   }
 
-  const Tick postStepTick = MakeTick();
-  if (!RunPostStepSystems(postStepTick)) {
-    if (!lastError_.has_value()) {
-      SetError("Simulation post-step system failed.");
-    }
+  if (!TickComponents(tick)) {
+    errorTracker_.SetErrorIfEmpty("Simulation tick component failed.");
+    return false;
+  }
+
+  if (!aircraft_.Tick()) {
+    errorTracker_.SetError("JSBSim simulation stopped.");
+    std::cerr << errorTracker_.GetLastError().value() << '\n';
+    return false;
+  }
+
+  const sim::Tick postTick = MakeTick();
+  if (!RunPostTickComponents(postTick)) {
+    errorTracker_.SetErrorIfEmpty("Simulation post-tick component failed.");
     return false;
   }
 
   ++tickIndex_;
 
-  const AircraftState aircraftState = aircraft_.GetAircraftState();
-  if (aircraftState.simulationTimeSec >= nextLogTime_) {
-    PrintState();
-    nextLogTime_ += LOG_INTERVAL_SEC;
-  }
-
   return true;
 }
 
-void Simulation::ResetLogTimer() { nextLogTime_ = 0.0; }
-
-void Simulation::PrintState() const {
-  const AircraftState state = aircraft_.GetAircraftState();
-  std::cout << "t=" << state.simulationTimeSec
-            << " s, altitude=" << state.altitudeAglFt
-            << " ft, airspeed=" << state.calibratedAirspeedKts
-            << " kt, pitch=" << state.pitchDeg << " deg\n";
-}
-
-bool Simulation::ValidateInitialCondition(
-    const InitialCondition &initialCondition) {
-  if (!std::isfinite(initialCondition.latitudeDeg)
-      || initialCondition.latitudeDeg < -90.0
-      || initialCondition.latitudeDeg > 90.0) {
-    SetError("Latitude must be finite and between -90 and 90 degrees.");
-    return false;
-  }
-
-  if (!std::isfinite(initialCondition.longitudeDeg)
-      || initialCondition.longitudeDeg < -180.0
-      || initialCondition.longitudeDeg > 180.0) {
-    SetError("Longitude must be finite and between -180 and 180 degrees.");
-    return false;
-  }
-
-  if (!std::isfinite(initialCondition.altitudeFt)) {
-    SetError("Altitude must be finite.");
-    return false;
-  }
-
-  if (!std::isfinite(initialCondition.rollDeg)
-      || !std::isfinite(initialCondition.pitchDeg)
-      || !std::isfinite(initialCondition.headingDeg)) {
-    SetError("Attitude values must be finite.");
-    return false;
-  }
-
-  if (!std::isfinite(initialCondition.airspeedKts)
-      || initialCondition.airspeedKts < 0.0) {
-    SetError("Airspeed must be finite and non-negative.");
-    return false;
-  }
-
-  if (!std::isfinite(initialCondition.pRadPerSec)
-      || !std::isfinite(initialCondition.qRadPerSec)
-      || !std::isfinite(initialCondition.rRadPerSec)) {
-    SetError("Angular rates must be finite.");
-    return false;
-  }
-
-  return true;
-}
-
-Context Simulation::MakeContext() {
-  return Context(aircraft_, config_, &lastError_);
-}
-
-bool Simulation::InitializeSystems() {
-  Context context = MakeContext();
-  for (System *system : systems_) {
-    if (system != nullptr && !system->Initialize(context)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool Simulation::ResetSystems() {
-  Context context = MakeContext();
-  for (System *system : systems_) {
-    if (system != nullptr && !system->Reset(context)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool Simulation::RunPreStepSystems(const Tick &tick) {
-  Context context = MakeContext();
-  for (System *system : systems_) {
-    if (system != nullptr && !system->PreStep(context, tick)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool Simulation::RunPostStepSystems(const Tick &tick) {
-  Context context = MakeContext();
-  for (System *system : systems_) {
-    if (system != nullptr && !system->PostStep(context, tick)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-void Simulation::ShutdownSystems() {
-  Context context = MakeContext();
-  for (auto iter = systems_.rbegin(); iter != systems_.rend(); ++iter) {
-    if (*iter != nullptr) {
-      (*iter)->Shutdown(context);
-    }
-  }
-}
-
-void Simulation::RegisterSystems() {
-  systems_.clear();
-  systems_.push_back(&keyboard_);
-  systems_.push_back(&autopilot_);
-  systems_.push_back(&flightGear_);
-}
-
-bool Simulation::ApplyInitialTrim(const InitialCondition &initialCondition) {
-  if (!autopilot_.ComputeTrim(aircraft_,
-          TrimRequestFromInitialCondition(initialCondition))) {
-    SetError("Initial trim failed.");
-    std::cerr << "Initial trim failed: " << *lastError_ << '\n';
-    return false;
-  }
-
-  if (!autopilot_.ApplyStoredTrim(aircraft_)) {
-    SetError("Failed to apply stored initial trim.");
-    std::cerr << *lastError_ << '\n';
-    return false;
-  }
-
-  if (const gnc::TrimResult *trimResult = autopilot_.GetTrimResult()) {
-    SetManualControlFromTrimResult(manualControlController_, *trimResult);
-  }
-
-  aircraft_.GetFDMExec().Setsim_time(0.0);
-  return true;
-}
-
-Tick Simulation::MakeTick() const {
-  return Tick{tickIndex_,
+sim::Tick Simulation::MakeTick() const {
+  return sim::Tick{tickIndex_,
       config_.GetDT(),
       aircraft_.GetAircraftState().simulationTimeSec};
 }
 
-void Simulation::SetError(std::string message) {
-  lastError_ = std::move(message);
+bool Simulation::ApplyInitialTrim(const InitialCondition &initialCondition) {
+  auto *flightControlManager = GetComponent<control::FlightControlManager>();
+  if (flightControlManager == nullptr) {
+    errorTracker_.SetError("Flight control component is missing.");
+    return false;
+  }
+
+  gnc::Autopilot &autopilot = flightControlManager->GetAutopilot();
+  if (!autopilot.ComputeTrim(aircraft_,
+          TrimRequestFromInitialCondition(initialCondition))) {
+    errorTracker_.SetError("Initial trim failed.");
+    std::cerr << "Initial trim failed: " << errorTracker_.GetLastError().value()
+              << '\n';
+    return false;
+  }
+
+  if (!autopilot.ApplyStoredTrim(aircraft_)) {
+    errorTracker_.SetError("Failed to apply stored initial trim.");
+    std::cerr << errorTracker_.GetLastError().value() << '\n';
+    return false;
+  }
+
+  if (const gnc::TrimResult *trimResult = autopilot.GetTrimResult()) {
+    flightControlManager->SynchronizeWithTrimResult(*trimResult);
+  }
+
+  aircraft_.ResetSimulationTime();
+  return true;
 }
+
+bool Simulation::InitializeComponent(Component &component) {
+  if (component.initialized_) {
+    return true;
+  }
+
+  if (!component.OnInitialize()) {
+    component.OnShutdown();
+    return false;
+  }
+
+  component.initialized_ = true;
+  return true;
+}
+
+bool Simulation::InitializeComponents() {
+  for (std::size_t index = 0; index < components_.size(); ++index) {
+    if (!InitializeComponent(*components_[index])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool Simulation::ResetComponents() {
+  for (const auto &component : components_) {
+    if (component->initialized_ && !component->OnReset()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool Simulation::RunPreTickComponents(const sim::Tick &tick) {
+  for (const auto &component : components_) {
+    if (component->initialized_ && !component->OnPreTick(tick)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool Simulation::TickComponents(const sim::Tick &tick) {
+  for (const auto &component : components_) {
+    if (component->initialized_ && !component->OnTick(tick)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool Simulation::RunPostTickComponents(const sim::Tick &tick) {
+  for (const auto &component : components_) {
+    if (component->initialized_ && !component->OnPostTick(tick)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void Simulation::ShutdownComponents() {
+  for (auto iterator = components_.rbegin(); iterator != components_.rend();
+      ++iterator) {
+    if ((*iterator)->initialized_) {
+      (*iterator)->OnShutdown();
+      (*iterator)->initialized_ = false;
+    }
+  }
+}
+
+Component *Simulation::FindComponent(const std::type_info &type) {
+  for (const auto &component : components_) {
+    if (typeid(*component) == type) {
+      return component.get();
+    }
+  }
+
+  return nullptr;
+}
+
+const Component *Simulation::FindComponent(const std::type_info &type) const {
+  for (const auto &component : components_) {
+    if (typeid(*component) == type) {
+      return component.get();
+    }
+  }
+
+  return nullptr;
+}
+
 } // namespace sim

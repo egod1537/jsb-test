@@ -1,13 +1,13 @@
 #pragma once
 
-#include "application/sim/control/FlightControlController.hpp"
+#include "application/sim/control/IFlightControlSource.hpp"
 
 namespace control {
-class ManualFlightControlController final : public FlightControlController {
+class ManualFlightControlController final : public IFlightControlSource {
 public:
-  const char *GetName() const override;
-  void Reset() override;
-  ControlInput Update(const sim::Aircraft &aircraft, double dt) override;
+  void OnReset();
+  ControlInput OnTick(const sim::Aircraft &aircraft,
+      const sim::Tick &tick) override;
 
   const ControlInput &GetCommandedInput() const;
   bool SetCommandedInput(const ControlInput &input);

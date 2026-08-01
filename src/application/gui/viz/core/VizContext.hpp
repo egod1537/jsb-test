@@ -5,7 +5,7 @@
 namespace viz {
 class LineCanvas;
 
-struct UpdateContext {
+struct TickContext {
   const FrameSnapshot &snapshot;
 };
 

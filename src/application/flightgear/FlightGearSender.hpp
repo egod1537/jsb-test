@@ -2,8 +2,8 @@
 
 #include <memory>
 
-namespace JSBSim {
-class FGFDMExec;
+namespace sim::jsbsim {
+class Properties;
 }
 
 namespace flightgear {
@@ -16,7 +16,7 @@ public:
   FlightGearSender &operator=(const FlightGearSender &) = delete;
 
   bool IsOpen() const;
-  bool Send(JSBSim::FGFDMExec &fdm);
+  bool Send(const sim::jsbsim::Properties &properties);
 
 private:
   class Impl;

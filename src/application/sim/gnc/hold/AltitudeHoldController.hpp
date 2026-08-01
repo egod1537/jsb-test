@@ -1,6 +1,6 @@
 #pragma once
 
-#include "application/sim/System.hpp"
+#include "application/sim/gnc/Controller.hpp"
 
 namespace gnc {
 struct AltitudeHoldSettings {
@@ -9,10 +9,9 @@ struct AltitudeHoldSettings {
   double derivativeGain = 0.0;
 };
 
-class AltitudeHoldController final : public sim::System {
+class AltitudeHoldController final : public Controller {
 public:
-  void Reset();
-  bool Reset(sim::Context &context) override;
+  void Reset() override;
 
   bool IsEnabled() const;
   void SetEnabled(bool enabled);
@@ -22,8 +21,6 @@ public:
 
   double GetTrimElevator() const;
   void SetTrimElevator(double trimElevator);
-
-  bool PreStep(sim::Context &context, const sim::Tick &tick) override;
 
 private:
   bool enabled_ = false;

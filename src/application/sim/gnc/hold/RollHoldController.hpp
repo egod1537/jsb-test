@@ -1,12 +1,13 @@
 #pragma once
 
-#include "application/sim/System.hpp"
+#include "application/sim/gnc/Controller.hpp"
 
 #include <optional>
 
 namespace sim {
 class Aircraft;
-}
+struct Tick;
+} // namespace sim
 
 namespace gnc {
 struct RollHoldSettings {
@@ -15,10 +16,9 @@ struct RollHoldSettings {
   double derivativeGain = 2.0;
 };
 
-class RollHoldController final : public sim::System {
+class RollHoldController final : public Controller {
 public:
-  void Reset();
-  bool Reset(sim::Context &context) override;
+  void Reset() override;
 
   bool IsEnabled() const;
   void SetEnabled(bool enabled);
@@ -29,8 +29,8 @@ public:
   double GetTrimAileron() const;
   void SetTrimAileron(double trimAileron);
 
-  std::optional<double> Update(const sim::Aircraft &aircraft, double dt);
-  bool PreStep(sim::Context &context, const sim::Tick &tick) override;
+  std::optional<double> OnTick(const sim::Aircraft &aircraft,
+      const sim::Tick &tick);
 
 private:
   bool enabled_ = false;

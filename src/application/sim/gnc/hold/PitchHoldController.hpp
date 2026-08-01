@@ -1,11 +1,13 @@
 #pragma once
 
-#include "application/sim/System.hpp"
+#include "application/sim/gnc/Controller.hpp"
+
 #include <optional>
 
 namespace sim {
 class Aircraft;
-}
+struct Tick;
+} // namespace sim
 
 namespace gnc {
 struct PitchHoldSettings {
@@ -14,10 +16,9 @@ struct PitchHoldSettings {
   double derivativeGain = 2.0;
 };
 
-class PitchHoldController final : public sim::System {
+class PitchHoldController final : public Controller {
 public:
-  void Reset();
-  bool Reset(sim::Context &context) override;
+  void Reset() override;
 
   bool IsEnabled() const;
   void SetEnabled(bool enabled);
@@ -28,8 +29,8 @@ public:
   double GetTrimElevator() const;
   void SetTrimElevator(double trimElevator);
 
-  std::optional<double> Update(const sim::Aircraft &aircraft, double);
-  bool PreStep(sim::Context &context, const sim::Tick &tick) override;
+  std::optional<double> OnTick(const sim::Aircraft &aircraft,
+      const sim::Tick &tick);
 
 private:
   bool enabled_ = false;

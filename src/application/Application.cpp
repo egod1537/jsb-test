@@ -1,5 +1,6 @@
 #include "Application.hpp"
 #include "application/gui/GUI.hpp"
+#include "application/input/Input.hpp"
 #include "application/sim/Simulation.hpp"
 
 #include <algorithm>
@@ -38,19 +39,19 @@ bool Application::Run(const volatile std::sig_atomic_t &running) {
   const Clock::duration guiInterval =
       guiDt > 0.0 ? ToClockDuration(guiDt) : simulationInterval;
 
-  auto nextSimulationUpdate = Clock::now();
-  auto nextGUIUpdate = nextSimulationUpdate;
+  auto nextSimulationTick = Clock::now();
+  auto nextGUITick = nextSimulationTick;
 
   while (succeeded && running && !gui_->ShouldClose()) {
     auto now = Clock::now();
 
-    while (now >= nextSimulationUpdate) {
-      if (!UpdateSimulation()) {
+    while (now >= nextSimulationTick) {
+      if (!TickSimulation()) {
         succeeded = false;
         break;
       }
 
-      nextSimulationUpdate += simulationInterval;
+      nextSimulationTick += simulationInterval;
       now = Clock::now();
     }
 
@@ -58,15 +59,14 @@ bool Application::Run(const volatile std::sig_atomic_t &running) {
       break;
     }
 
-    if (now >= nextGUIUpdate) {
-      UpdateGUI();
+    if (now >= nextGUITick) {
+      TickGUI();
       do {
-        nextGUIUpdate += guiInterval;
-      } while (nextGUIUpdate <= now);
+        nextGUITick += guiInterval;
+      } while (nextGUITick <= now);
     }
 
-    std::this_thread::sleep_until(
-        std::min(nextSimulationUpdate, nextGUIUpdate));
+    std::this_thread::sleep_until(std::min(nextSimulationTick, nextGUITick));
   }
 
   Exit();
@@ -79,8 +79,19 @@ bool Application::Start() {
     return false;
   }
 
-  if (!sim_->Start(simConfig_)) {
-    std::cerr << "Failed to start simulation\n";
+  gui_->SetSimulationExecutionControl(this);
+
+  if (!application::Input::Initialize()) {
+    std::cerr << "Failed to initialize input\n";
+    return false;
+  }
+
+  if (!sim_->Initialize(simConfig_)) {
+    std::cerr << "Failed to initialize simulation\n";
+    return false;
+  }
+
+  if (!flightGear_.Initialize()) {
     return false;
   }
 
@@ -89,19 +100,95 @@ bool Application::Start() {
     return false;
   }
 
+  simulationExecutionState_ = application::SimulationExecutionState::Running;
+  pendingSimulationTicks_ = 0;
   return true;
 }
 
-bool Application::UpdateSimulation() { return sim_->Update(); }
+bool Application::TickSimulation() {
+  const bool isPaused = simulationExecutionState_
+                        == application::SimulationExecutionState::Paused;
+  if (isPaused && pendingSimulationTicks_ == 0) {
+    return true;
+  }
 
-void Application::UpdateGUI() { gui_->Update(); }
+  if (simulationExecutionState_
+          != application::SimulationExecutionState::Running
+      && !isPaused) {
+    return true;
+  }
+
+  application::Input::Update();
+
+  if (!sim_->Tick()) {
+    return false;
+  }
+
+  flightGear_.Update(sim_->GetAircraft());
+
+  if (isPaused) {
+    --pendingSimulationTicks_;
+  }
+
+  return true;
+}
+
+void Application::PauseSimulation() {
+  if (simulationExecutionState_
+      == application::SimulationExecutionState::Running) {
+    simulationExecutionState_ = application::SimulationExecutionState::Paused;
+  }
+}
+
+void Application::ResumeSimulation() {
+  if (simulationExecutionState_
+      == application::SimulationExecutionState::Paused) {
+    pendingSimulationTicks_ = 0;
+    simulationExecutionState_ = application::SimulationExecutionState::Running;
+  }
+}
+
+void Application::RequestSimulationTick() {
+  if (simulationExecutionState_
+      == application::SimulationExecutionState::Paused) {
+    ++pendingSimulationTicks_;
+  }
+}
+
+bool Application::ResetSimulation() {
+  if (!sim_->Reset()) {
+    return false;
+  }
+
+  flightGear_.Update(sim_->GetAircraft());
+  return true;
+}
+
+bool Application::ResetSimulation(
+    const sim::InitialCondition &initialCondition) {
+  if (!sim_->Reset(initialCondition)) {
+    return false;
+  }
+
+  flightGear_.Update(sim_->GetAircraft());
+  return true;
+}
+
+void Application::TickGUI() { gui_->Tick(); }
 
 void Application::Exit() {
+  simulationExecutionState_ = application::SimulationExecutionState::Stopped;
+  pendingSimulationTicks_ = 0;
+
   if (gui_ != nullptr) {
     gui_->Exit();
   }
 
+  flightGear_.Shutdown();
+
   if (sim_ != nullptr) {
-    sim_->Exit();
+    sim_->Shutdown();
   }
+
+  application::Input::Shutdown();
 }

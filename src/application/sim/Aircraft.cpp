@@ -1,15 +1,12 @@
 #include "application/sim/Aircraft.hpp"
+#include "application/sim/gnc/TrimTypes.hpp"
 
 #include <FGFDMExec.h>
-#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <initialization/FGInitialCondition.h>
+#include <initialization/FGTrim.h>
 #include <iostream>
-#include <models/FGFCS.h>
-#include <models/FGPropulsion.h>
-#include <models/propulsion/FGEngine.h>
-#include <models/propulsion/FGThruster.h>
 #include <simgear/misc/sg_path.hxx>
 #include <string>
 #include <utility>
@@ -59,17 +56,31 @@ std::string ResolveJSBSimRootPath() {
 
   return (cwd / "build" / "debug" / "_deps" / "jsbsim-src").generic_string();
 }
+
+int ToJSBTrimMode(gnc::TrimMode mode) {
+  switch (mode) {
+  case gnc::TrimMode::Longitudinal:
+    return JSBSim::tLongitudinal;
+  case gnc::TrimMode::Full:
+    return JSBSim::tFull;
+  case gnc::TrimMode::Ground:
+    return JSBSim::tGround;
+  }
+
+  return JSBSim::tNone;
+}
 } // namespace
 
 namespace sim {
 Aircraft::Aircraft()
-    : fdm_(std::make_unique<JSBSim::FGFDMExec>()), properties_(*fdm_),
-      flightControls_(*fdm_) {}
+    : fdm_(std::make_unique<JSBSim::FGFDMExec>()), controls_(*fdm_),
+      engines_(*fdm_), properties_(*fdm_) {}
 
 Aircraft::~Aircraft() = default;
 
-bool Aircraft::Initialize(const SimulationConfig &config) {
-  controlInput_ = {};
+bool Aircraft::Initialize(const SimulationConfig &config,
+    const InitialCondition &initialCondition) {
+  controls_.SetInput({});
 
   ConfigurePaths();
   if (!LoadAircraft(config)) {
@@ -77,16 +88,14 @@ bool Aircraft::Initialize(const SimulationConfig &config) {
   }
 
   ConfigureSimulation(config);
-  ConfigureInitialConditions(config);
+  SetInitialConditionInputs(initialCondition);
   return InitializeState();
 }
 
-bool Aircraft::Step() {
-  ApplyControlInput();
+bool Aircraft::Tick() {
+  controls_.Apply();
   return fdm_->Run();
 }
-
-bool Aircraft::Update() { return Step(); }
 
 AircraftState Aircraft::GetAircraftState() const {
   AircraftState state{};
@@ -147,7 +156,7 @@ void Aircraft::SetInitialConditionInputs(
   ic->SetRRadpsIC(initialCondition.rRadPerSec);
 }
 
-InitialCondition Aircraft::CaptureCurrentCondition() const {
+InitialCondition Aircraft::GetCurrentCondition() const {
   InitialCondition initialCondition{};
   initialCondition.latitudeDeg =
       RadToDegValue(properties_.Get(CurrentLatitudeRad));
@@ -169,141 +178,49 @@ InitialCondition Aircraft::CaptureCurrentCondition() const {
 bool Aircraft::Reset(const SimulationConfig &config,
     const InitialCondition &initialCondition) {
   ConfigureSimulation(config);
-  ResetControlInput();
+  controls_.Reset();
 
   if (!ApplyInitialCondition(initialCondition)) {
     return false;
   }
 
-  fdm_->Setsim_time(0.0);
+  ResetSimulationTime();
 
-  ResetControlInput();
+  controls_.Reset();
   return true;
 }
 
-JSBSim::FGFDMExec &Aircraft::GetFDMExec() { return *fdm_; }
+void Aircraft::ResetSimulationTime() { fdm_->Setsim_time(0.0); }
 
-const JSBSim::FGFDMExec &Aircraft::GetFDMExec() const { return *fdm_; }
+bool Aircraft::ApplyTrimInitialCondition(const gnc::TrimRequest &request) {
+  if (request.mode != gnc::TrimMode::Ground) {
+    auto initialCondition = fdm_->GetIC();
+    initialCondition->SetVcalibratedKtsIC(request.airspeedKts);
+    initialCondition->SetAltitudeASLFtIC(request.altitudeFt);
+    initialCondition->SetFlightPathAngleDegIC(request.flightPathAngleDeg);
+  }
 
-JSBSim::FlightProperties &Aircraft::GetProperties() { return properties_; }
+  return fdm_->RunIC();
+}
 
-const JSBSim::FlightProperties &Aircraft::GetProperties() const {
+void Aircraft::ExecuteTrim(gnc::TrimMode mode) {
+  fdm_->DoTrim(ToJSBTrimMode(mode));
+}
+
+jsbsim::ControlSystem &Aircraft::GetControls() { return controls_; }
+
+const jsbsim::ControlSystem &Aircraft::GetControls() const {
+  return controls_;
+}
+
+jsbsim::EngineSystem &Aircraft::GetEngines() { return engines_; }
+
+const jsbsim::EngineSystem &Aircraft::GetEngines() const { return engines_; }
+
+jsbsim::Properties &Aircraft::GetProperties() { return properties_; }
+
+const jsbsim::Properties &Aircraft::GetProperties() const {
   return properties_;
-}
-
-JSBSim::FlightControls &Aircraft::GetFlightControls() {
-  return flightControls_;
-}
-
-const JSBSim::FlightControls &Aircraft::GetFlightControls() const {
-  return flightControls_;
-}
-
-const control::ControlInput &Aircraft::GetAircraftControlInput() const {
-  return controlInput_;
-}
-
-void Aircraft::SetAircraftControlInput(const control::ControlInput &input) {
-  controlInput_ = input;
-  control::ClampControlInput(controlInput_);
-}
-
-bool Aircraft::SetElevatorInput(double value) {
-  return control::SetControlAxisValue(controlInput_,
-      control::ControlAxis::Elevator,
-      value);
-}
-
-bool Aircraft::SetAileronInput(double value) {
-  return control::SetControlAxisValue(controlInput_,
-      control::ControlAxis::Aileron,
-      value);
-}
-
-bool Aircraft::SetRudderInput(double value) {
-  return control::SetControlAxisValue(controlInput_,
-      control::ControlAxis::Rudder,
-      value);
-}
-
-bool Aircraft::SetThrottleInput(double value) {
-  return control::SetControlAxisValue(controlInput_,
-      control::ControlAxis::Throttle,
-      value);
-}
-
-const control::ControlInput &Aircraft::GetControlInput() const {
-  return GetAircraftControlInput();
-}
-
-void Aircraft::ResetControlInput() {
-  controlInput_ = {};
-
-  flightControls_.SetPitchTrim(0.0);
-  ApplyControlInput();
-}
-
-std::size_t Aircraft::GetEngineCount() const {
-  const auto propulsion = fdm_->GetPropulsion();
-  return propulsion != nullptr ? propulsion->GetNumEngines() : 0U;
-}
-
-EngineState Aircraft::GetEngineState(std::size_t index) const {
-  EngineState state{};
-  state.index = index;
-
-  const auto propulsion = fdm_->GetPropulsion();
-  const auto fcs = fdm_->GetFCS();
-  if (propulsion == nullptr || index >= propulsion->GetNumEngines()) {
-    return state;
-  }
-
-  const auto engine = propulsion->GetEngine(static_cast<unsigned int>(index));
-  if (engine == nullptr) {
-    return state;
-  }
-
-  state.running = engine->GetRunning();
-  state.throttleCommand =
-      fcs != nullptr ? fcs->GetThrottleCmd(static_cast<int>(index)) : 0.0;
-
-  const auto thruster = engine->GetThruster();
-  state.rpm = thruster != nullptr ? thruster->GetEngineRPM() : 0.0;
-
-  return state;
-}
-
-std::vector<EngineState> Aircraft::GetEngineStates() const {
-  std::vector<EngineState> states;
-  const std::size_t engineCount = GetEngineCount();
-  states.reserve(engineCount);
-
-  for (std::size_t index = 0; index < engineCount; ++index) {
-    states.push_back(GetEngineState(index));
-  }
-
-  return states;
-}
-
-bool Aircraft::IsAnyEngineRunning() const {
-  for (const EngineState &engineState : GetEngineStates()) {
-    if (engineState.running) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool Aircraft::AreAllEnginesRunning() const {
-  const auto engineStates = GetEngineStates();
-  if (engineStates.empty()) {
-    return false;
-  }
-
-  return std::all_of(engineStates.begin(),
-      engineStates.end(),
-      [](const EngineState &engineState) { return engineState.running; });
 }
 
 void Aircraft::ConfigurePaths() {
@@ -327,17 +244,6 @@ void Aircraft::ConfigureSimulation(const SimulationConfig &config) {
   fdm_->Setdt(config.GetDT());
 }
 
-void Aircraft::ConfigureInitialConditions(const SimulationConfig &config) {
-  auto ic = fdm_->GetIC();
-
-  ic->SetAltitudeASLFtIC(config.altitudeFt);
-  ic->SetVcalibratedKtsIC(config.calibratedAirspeedKts);
-
-  ic->SetPhiDegIC(config.rollDeg);
-  ic->SetThetaDegIC(config.pitchDeg);
-  ic->SetPsiDegIC(config.headingDeg);
-}
-
 bool Aircraft::InitializeState() {
   if (!fdm_->RunIC()) {
     std::cerr << "Failed to initialize simulation\n";
@@ -349,10 +255,4 @@ bool Aircraft::InitializeState() {
   return true;
 }
 
-void Aircraft::ApplyControlInput() {
-  flightControls_.SetElevator(controlInput_.elevator);
-  flightControls_.SetAileron(controlInput_.aileron);
-  flightControls_.SetRudder(controlInput_.rudder);
-  flightControls_.SetThrottle(controlInput_.throttle);
-}
 } // namespace sim

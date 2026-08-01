@@ -16,6 +16,7 @@ template <typename T> class RingBuffer {
 public:
   explicit RingBuffer(std::size_t capacity = 0) { reserve(capacity); }
 
+  // Capacity and mutation
   void reserve(std::size_t capacity) {
     std::vector<T> ordered = to_vector();
     if (ordered.size() > capacity) {
@@ -36,6 +37,7 @@ public:
   void push_back(const T &value) { push(value); }
   void push_back(T &&value) { push(std::move(value)); }
 
+  // Status
   std::size_t capacity() const { return m_Capacity; }
   std::size_t size() const { return m_Values.size(); }
   int offset() const {
@@ -44,22 +46,23 @@ public:
   }
 
   bool empty() const { return m_Values.empty(); }
-  bool full() const {
-    return m_Capacity > 0 && m_Values.size() == m_Capacity;
-  }
+  bool full() const { return m_Capacity > 0 && m_Values.size() == m_Capacity; }
 
+  // Storage views
   const T *data() const { return m_Values.data(); }
   T *data() { return m_Values.data(); }
 
   std::span<const T> span() const { return {data(), size()}; }
   std::span<T> span() { return {data(), size()}; }
 
+  // Plot integration
   FlightUI::DataView data_view() const
     requires(std::is_same_v<T, double> || std::is_same_v<T, float>)
   {
     return FlightUI::DataView(data(), size());
   }
 
+  // Logical indexing
   const T &operator[](std::size_t logicalIndex) const {
     return m_Values[physical_index(logicalIndex)];
   }
@@ -68,6 +71,7 @@ public:
     return m_Values[physical_index(logicalIndex)];
   }
 
+  // Ordered copy
   std::vector<T> to_vector() const {
     std::vector<T> ordered;
     ordered.reserve(size());
@@ -78,6 +82,7 @@ public:
   }
 
 private:
+  // Storage management
   template <typename U> void push(U &&value) {
     if (m_Capacity == 0) {
       return;
@@ -100,6 +105,7 @@ private:
     return (m_Offset + logicalIndex) % m_Values.size();
   }
 
+  // Ring storage
   std::vector<T> m_Values;
   std::size_t m_Capacity = 0;
   std::size_t m_Offset = 0;

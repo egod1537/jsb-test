@@ -6,7 +6,6 @@
 
 namespace sim {
 class Aircraft;
-class Simulation;
 } // namespace sim
 
 namespace gui {
@@ -15,7 +14,7 @@ public:
   GNCWindow();
 
 protected:
-  void OnUpdate(gui::GUI &gui) override;
+  void OnRender(gui::GUI &gui) override;
 
 private:
   enum class PendingTrimCommand {
@@ -24,14 +23,18 @@ private:
     CurrentState,
   };
 
+  // Trim command handling
   void RequestTrim(PendingTrimCommand command);
-  void ExecutePendingTrim(sim::Simulation &simulation);
+  void ExecutePendingTrim(gui::GUI &gui);
 
+  // Trim state
   gnc::TrimRequest trimRequest_;
   bool trimResultOpen_ = true;
   bool trimResidualOpen_ = true;
   bool trimInProgress_ = false;
   PendingTrimCommand pendingTrimCommand_ = PendingTrimCommand::None;
+
+  // Autopilot UI state
   AutopilotPanelState autopilotPanelState_;
 };
 } // namespace gui

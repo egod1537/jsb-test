@@ -115,10 +115,14 @@ add_executable(
   jsb-flight-console
   src/main.cpp
   src/application/Application.cpp
+  src/application/input/Input.cpp
   src/application/sim/Aircraft.cpp
-  src/application/sim/Context.cpp
+  src/application/sim/Component.cpp
+  src/application/sim/ErrorTracker.cpp
+  src/application/sim/InitialCondition.cpp
+  src/application/sim/StateLogger.cpp
   src/application/sim/control/ManualFlightControlController.cpp
-  src/application/sim/control/AutopilotFlightControlController.cpp
+  src/application/sim/control/FlightControlManager.cpp
   src/application/sim/gnc/TrimSolver.cpp
   src/application/sim/gnc/Autopilot.cpp
   src/application/sim/gnc/hold/RollHoldController.cpp
@@ -126,7 +130,6 @@ add_executable(
   src/application/sim/gnc/hold/AirspeedHoldController.cpp
   src/application/sim/gnc/hold/CourseHoldController.cpp
   src/application/sim/gnc/hold/AltitudeHoldController.cpp
-  src/application/sim/state/TrueStateProvider.cpp
   src/application/gui/viz/core/Component.cpp
   src/application/gui/viz/core/GameObject.cpp
   src/application/gui/viz/core/Scene.cpp
@@ -150,13 +153,12 @@ add_executable(
   src/application/gui/windows/GNCWindow.cpp
   src/application/gui/windows/samples/DeclarativeDemoWindow.cpp
   src/application/gui/windows/samples/SamplePlotWindow.cpp
-  src/application/sim/jsbsim/FlightControls.cpp
-  src/application/sim/jsbsim/FlightProperties.cpp
+  src/application/sim/jsbsim/ControlSystem.cpp
+  src/application/sim/jsbsim/Properties.cpp
+  src/application/sim/jsbsim/EngineSystem.cpp
   src/application/flightgear/FlightGearSender.cpp
   src/application/flightgear/FlightGearSystem.cpp
   src/application/sim/Simulation.cpp
-  src/application/sim/control/KeyboardInput.cpp
-  src/application/sim/control/KeyboardInputSystem.cpp
 )
 
 target_compile_features(
@@ -208,18 +210,18 @@ add_test(
 add_executable(
   simulation_tests
   tests/SimulationTests.cpp
+  src/application/input/Input.cpp
   src/application/sim/Simulation.cpp
   src/application/sim/Aircraft.cpp
-  src/application/sim/Context.cpp
-  src/application/sim/state/TrueStateProvider.cpp
-  src/application/sim/jsbsim/FlightControls.cpp
-  src/application/sim/jsbsim/FlightProperties.cpp
-  src/application/flightgear/FlightGearSender.cpp
-  src/application/flightgear/FlightGearSystem.cpp
-  src/application/sim/control/KeyboardInput.cpp
-  src/application/sim/control/KeyboardInputSystem.cpp
+  src/application/sim/Component.cpp
+  src/application/sim/ErrorTracker.cpp
+  src/application/sim/InitialCondition.cpp
+  src/application/sim/StateLogger.cpp
+  src/application/sim/jsbsim/ControlSystem.cpp
+  src/application/sim/jsbsim/Properties.cpp
+  src/application/sim/jsbsim/EngineSystem.cpp
   src/application/sim/control/ManualFlightControlController.cpp
-  src/application/sim/control/AutopilotFlightControlController.cpp
+  src/application/sim/control/FlightControlManager.cpp
   src/application/sim/gnc/TrimSolver.cpp
   src/application/sim/gnc/Autopilot.cpp
   src/application/sim/gnc/hold/RollHoldController.cpp
@@ -247,14 +249,6 @@ target_link_libraries(
   libJSBSim
   Eigen3::Eigen
 )
-
-if(WIN32)
-  target_link_libraries(
-    simulation_tests
-    PRIVATE
-    ws2_32
-  )
-endif()
 
 add_test(
   NAME simulation_tests

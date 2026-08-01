@@ -10,7 +10,7 @@ class AircraftWireframeRenderer final : public Component {
 public:
   AircraftWireframeRenderer();
 
-  void Update(const UpdateContext &context) override;
+  void OnTick(const TickContext &context) override;
   void Render(RenderContext &context) const override;
 
 private:

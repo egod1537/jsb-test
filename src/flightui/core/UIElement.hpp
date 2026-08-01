@@ -8,6 +8,7 @@
 namespace FlightUI {
 class UIElement {
 public:
+  // Lifetime
   UIElement();
   UIElement(const UIElement &other);
   UIElement(UIElement &&other) noexcept;
@@ -15,10 +16,12 @@ public:
   UIElement &operator=(UIElement &&other) noexcept;
   ~UIElement();
 
+  // Rendering and validity
   void Render() const;
   bool IsValid() const;
 
 private:
+  // Shared implementation
   class Impl;
   std::shared_ptr<Impl> m_Impl;
 
@@ -31,11 +34,13 @@ using Children = std::vector<UIElement>;
 
 class ChildrenBuilder {
 public:
+  // Construction and composition
   ChildrenBuilder();
   explicit ChildrenBuilder(UIElement child);
 
   ChildrenBuilder operator+(UIElement child) const;
 
+  // Child access
   const Children &GetChildren() const;
   Children TakeChildren() &&;
 

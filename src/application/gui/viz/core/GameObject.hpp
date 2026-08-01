@@ -12,17 +12,19 @@
 namespace viz {
 class GameObject {
 public:
+  // Lifetime
   explicit GameObject(std::string name);
   ~GameObject();
 
   GameObject(const GameObject &) = delete;
   GameObject &operator=(const GameObject &) = delete;
 
+  // Identity and transform
   const std::string &GetName() const { return name_; }
-
   Transform &GetTransform() { return transform_; }
   const Transform &GetTransform() const { return transform_; }
 
+  // Components
   template <typename T, typename... Args> T &AddComponent(Args &&...args) {
     static_assert(std::is_base_of_v<Component, T>,
         "T must inherit from viz::Component");
@@ -34,12 +36,16 @@ public:
     return componentRef;
   }
 
-  void Update(const UpdateContext &context);
+  // Frame lifecycle
+  void Tick(const TickContext &context);
   void Render(RenderContext &context) const;
 
 private:
+  // Object state
   std::string name_;
   Transform transform_;
+
+  // Component ownership
   std::vector<std::unique_ptr<Component>> components_;
 };
 } // namespace viz

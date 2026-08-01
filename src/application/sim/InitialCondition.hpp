@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace sim {
 struct InitialCondition {
   double latitudeDeg = 0.0;
@@ -16,4 +18,7 @@ struct InitialCondition {
   double qRadPerSec = 0.0;
   double rRadPerSec = 0.0;
 };
+
+bool ValidateInitialCondition(const InitialCondition &initialCondition,
+    std::string *errorMessage = nullptr);
 } // namespace sim

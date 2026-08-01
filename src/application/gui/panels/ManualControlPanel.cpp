@@ -364,7 +364,7 @@ void ManualControlPanel::Draw(
   MakeManualInputLayout(manualController,
       autopilotState,
       manualController.GetCommandedInput(),
-      aircraft.GetFlightControls().GetPitchTrim())
+      aircraft.GetControls().GetPitchTrim())
       .Render();
 }
 } // namespace gui

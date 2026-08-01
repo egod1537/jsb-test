@@ -1,11 +1,13 @@
 #pragma once
 
-#include "application/sim/System.hpp"
+#include "application/sim/gnc/Controller.hpp"
+
 #include <optional>
 
 namespace sim {
 class Aircraft;
-}
+struct Tick;
+} // namespace sim
 
 namespace gnc {
 struct AirspeedHoldSettings {
@@ -14,10 +16,9 @@ struct AirspeedHoldSettings {
   double derivativeGain = 0.0;
 };
 
-class AirspeedHoldController final : public sim::System {
+class AirspeedHoldController final : public Controller {
 public:
-  void Reset();
-  bool Reset(sim::Context &context) override;
+  void Reset() override;
 
   bool IsEnabled() const;
   void SetEnabled(bool enabled);
@@ -28,8 +29,8 @@ public:
   double GetTrimThrottle() const;
   void SetTrimThrottle(double trimThrottle);
 
-  std::optional<double> Update(const sim::Aircraft &aircraft, double);
-  bool PreStep(sim::Context &context, const sim::Tick &tick) override;
+  std::optional<double> OnTick(const sim::Aircraft &aircraft,
+      const sim::Tick &tick);
 
 private:
   bool enabled_ = false;

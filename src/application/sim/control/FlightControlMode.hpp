@@ -2,12 +2,15 @@
 
 namespace control {
 enum class FlightControlMode {
+  None,
   Manual,
   Autopilot,
 };
 
 inline const char *ToString(FlightControlMode mode) {
   switch (mode) {
+  case FlightControlMode::None:
+    return "None";
   case FlightControlMode::Manual:
     return "Manual";
   case FlightControlMode::Autopilot:

@@ -10,6 +10,7 @@
 namespace FlightUI {
 class PanelBuilder {
 public:
+  // Lifetime
   explicit PanelBuilder(std::string name);
   PanelBuilder(const PanelBuilder &other);
   PanelBuilder(PanelBuilder &&other) noexcept;
@@ -17,6 +18,7 @@ public:
   PanelBuilder &operator=(PanelBuilder &&other) noexcept;
   ~PanelBuilder();
 
+  // Explicit configuration
   PanelBuilder &SetWidth(float width);
   PanelBuilder &SetHeight(float height);
   PanelBuilder &SetSize(Vector2 size);
@@ -29,6 +31,7 @@ public:
   PanelBuilder &SetTooltip(std::string tooltip);
   PanelBuilder &SetId(std::string id);
 
+  // Fluent configuration
   PanelBuilder &Width(float width);
   PanelBuilder &Height(float height);
   PanelBuilder &Size(Vector2 size);
@@ -41,11 +44,13 @@ public:
   PanelBuilder &Tooltip(std::string tooltip);
   PanelBuilder &Id(std::string id);
 
+  // Child content
   UIElement operator[](UIElement child) const;
   UIElement operator[](Children children) const;
   UIElement operator[](ChildrenBuilder children) const;
 
 private:
+  // Implementation state
   class Impl;
   std::unique_ptr<Impl> m_Impl;
 };

@@ -15,7 +15,7 @@ DeclarativeDemoWindow::DeclarativeDemoWindow() = default;
 
 DeclarativeDemoWindow::~DeclarativeDemoWindow() = default;
 
-void DeclarativeDemoWindow::Update(GUI &) {
+void DeclarativeDemoWindow::OnTick(GUI &) {
   AppendTelemetrySample();
 
   // clang-format off

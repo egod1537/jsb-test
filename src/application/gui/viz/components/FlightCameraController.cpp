@@ -16,7 +16,7 @@ viz::Vec3 AircraftForward(const sim::AircraftState &state) {
 } // namespace
 
 namespace viz {
-void FlightCameraController::Update(const UpdateContext &context) {
+void FlightCameraController::OnTick(const TickContext &context) {
   if (camera_ == nullptr) {
     return;
   }
@@ -33,7 +33,7 @@ void FlightCameraController::Update(const UpdateContext &context) {
 }
 
 void FlightCameraController::ApplyOrbitCamera(
-    const UpdateContext &context) const {
+    const TickContext &context) const {
   const float altitude = std::max(context.snapshot.visualAltitude, 0.35F);
   const float pullBack = std::min(altitude * 0.18F, 8.0F);
   const float lift = std::min(altitude * 0.10F, 8.0F);
@@ -45,7 +45,7 @@ void FlightCameraController::ApplyOrbitCamera(
 }
 
 void FlightCameraController::ApplyThirdPersonCamera(
-    const UpdateContext &context) const {
+    const TickContext &context) const {
   const Vec3 aircraftPosition{0.0F, 0.0F, 0.35F};
   const Vec3 forward = AircraftForward(context.snapshot.aircraftState);
   const float altitude = std::max(context.snapshot.visualAltitude, 0.35F);

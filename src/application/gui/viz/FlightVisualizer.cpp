@@ -24,7 +24,7 @@ constexpr float FeetPerVizUnit = 75.0F;
 constexpr float HighAltitudeLogFt = 450.0F;
 constexpr float HighAltitudeLogScale = 8.0F;
 constexpr float MetersPerVizUnit = FeetPerVizUnit * 0.3048F;
-constexpr double MaxMotionStepSec = 0.25;
+constexpr double MaxMotionTickSec = 0.25;
 constexpr double KnotsToMetersPerSec = 0.5144444444444445;
 
 float VisualAltitudeFromAglFt(double altitudeAglFt) {
@@ -68,18 +68,18 @@ FlightVisualizer::FlightVisualizer() { BuildScene(); }
 
 FlightVisualizer::~FlightVisualizer() = default;
 
-bool FlightVisualizer::Update(const sim::Aircraft &aircraft) {
+bool FlightVisualizer::Tick(const sim::Aircraft &aircraft) {
   snapshot_.aircraftState = aircraft.GetAircraftState();
-  snapshot_.controlInput = aircraft.GetAircraftControlInput();
-  snapshot_.pitchTrim = aircraft.GetFlightControls().GetPitchTrim();
-  UpdateGroundScroll(snapshot_.aircraftState);
+  snapshot_.controlInput = aircraft.GetControls().GetInput();
+  snapshot_.pitchTrim = aircraft.GetControls().GetPitchTrim();
+  SyncGroundScroll(snapshot_.aircraftState);
   snapshot_.viewMode = viewMode_;
   snapshot_.viewOptions = viewOptions_;
   snapshot_.groundScroll = groundScroll_;
   snapshot_.visualAltitude =
       VisualAltitudeFromAglFt(snapshot_.aircraftState.altitudeAglFt);
   snapshot_.hasAircraft = true;
-  scene_.Update(snapshot_);
+  scene_.Tick(snapshot_);
   return true;
 }
 
@@ -93,7 +93,7 @@ void FlightVisualizer::RenderScene() {
   snapshot_.viewMode = viewMode_;
   snapshot_.viewOptions = viewOptions_;
   snapshot_.groundScroll = groundScroll_;
-  scene_.Update(snapshot_);
+  scene_.Tick(snapshot_);
 
   const ImVec2 available = ImGui::GetContentRegionAvail();
   const ImVec2 size{
@@ -165,7 +165,7 @@ void FlightVisualizer::ToggleViewMode() {
                                            : ViewMode::Orbit;
 }
 
-void FlightVisualizer::UpdateGroundScroll(const sim::AircraftState &state) {
+void FlightVisualizer::SyncGroundScroll(const sim::AircraftState &state) {
   const double sampleTime = state.simulationTimeSec;
   if (!std::isfinite(sampleTime)) {
     hasMotionSample_ = false;
@@ -181,7 +181,7 @@ void FlightVisualizer::UpdateGroundScroll(const sim::AircraftState &state) {
 
   const double dt = sampleTime - lastMotionSampleTimeSec_;
   lastMotionSampleTimeSec_ = sampleTime;
-  if (dt <= 0.0 || dt > MaxMotionStepSec) {
+  if (dt <= 0.0 || dt > MaxMotionTickSec) {
     return;
   }
 

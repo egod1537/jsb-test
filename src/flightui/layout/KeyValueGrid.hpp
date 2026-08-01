@@ -8,6 +8,7 @@
 namespace FlightUI {
 class KeyValueGridBuilder {
 public:
+  // Lifetime
   explicit KeyValueGridBuilder(std::string id);
   KeyValueGridBuilder(const KeyValueGridBuilder &other);
   KeyValueGridBuilder(KeyValueGridBuilder &&other) noexcept;
@@ -15,6 +16,7 @@ public:
   KeyValueGridBuilder &operator=(KeyValueGridBuilder &&other) noexcept;
   ~KeyValueGridBuilder();
 
+  // Explicit configuration and values
   KeyValueGridBuilder &SetColumnsPerRow(int columnsPerRow);
   KeyValueGridBuilder &SetLabelWidth(float width);
   KeyValueGridBuilder &SetEnabled(bool enabled);
@@ -25,15 +27,18 @@ public:
       std::string format);
   KeyValueGridBuilder &AddInt(std::string label, int value, std::string format);
 
+  // Fluent configuration
   KeyValueGridBuilder &ColumnsPerRow(int columnsPerRow);
   KeyValueGridBuilder &LabelWidth(float width);
   KeyValueGridBuilder &Enabled(bool enabled);
   KeyValueGridBuilder &Visible(bool visible);
   KeyValueGridBuilder &Tooltip(std::string tooltip);
 
+  // Element conversion
   operator UIElement() const;
 
 private:
+  // Implementation state
   class Impl;
   std::unique_ptr<Impl> m_Impl;
 };

@@ -5,7 +5,7 @@
 namespace viz {
 class GroundGridRenderer final : public Component {
 public:
-  void Update(const UpdateContext &context) override;
+  void OnTick(const TickContext &context) override;
   void Render(RenderContext &context) const override;
 
 private:

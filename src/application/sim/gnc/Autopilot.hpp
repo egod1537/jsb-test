@@ -1,6 +1,7 @@
 #pragma once
 
-#include "application/sim/System.hpp"
+#include "application/sim/control/IFlightControlSource.hpp"
+#include "application/sim/gnc/Controller.hpp"
 #include "application/sim/gnc/hold/AirspeedHoldController.hpp"
 #include "application/sim/gnc/hold/AltitudeHoldController.hpp"
 #include "application/sim/gnc/hold/CourseHoldController.hpp"
@@ -8,18 +9,29 @@
 #include "application/sim/gnc/hold/RollHoldController.hpp"
 #include "application/sim/gnc/TrimTypes.hpp"
 
+#include <memory>
 #include <optional>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace gnc {
-class Autopilot final : public sim::System {
+class Autopilot final : public control::IFlightControlSource {
 public:
-  const char *GetName() const;
-  void Reset();
+  explicit Autopilot(control::IFlightControlSource &passthroughSource);
 
-  bool Initialize(sim::Context &context) override;
-  bool Reset(sim::Context &context) override;
-  bool PreStep(sim::Context &context, const sim::Tick &tick) override;
+  // Lifecycle and control output
+  void OnReset();
+  control::ControlInput OnTick(const sim::Aircraft &aircraft,
+      const sim::Tick &tick) override;
 
+  // Controller registry
+  template <typename T, typename... Args> T *AddController(Args &&...args);
+  template <typename T> T *GetController();
+  template <typename T> const T *GetController() const;
+  template <typename T> bool RemoveController();
+
+  // Trim
   bool ComputeTrim(sim::Aircraft &aircraft, const TrimRequest &request);
   bool ComputeCurrentStateTrim(sim::Aircraft &aircraft,
       TrimMode mode = TrimMode::Longitudinal);
@@ -29,37 +41,33 @@ public:
   bool HasTrimResult() const;
   const TrimResult *GetTrimResult() const;
 
-  RollHoldController &GetRollHoldController();
-  const RollHoldController &GetRollHoldController() const;
-  PitchHoldController &GetPitchHoldController();
-  const PitchHoldController &GetPitchHoldController() const;
-  AirspeedHoldController &GetAirspeedHoldController();
-  const AirspeedHoldController &GetAirspeedHoldController() const;
-  CourseHoldController &GetCourseHoldController();
-  const CourseHoldController &GetCourseHoldController() const;
-  AltitudeHoldController &GetAltitudeHoldController();
-  const AltitudeHoldController &GetAltitudeHoldController() const;
-
+  // Hold state
   bool IsRollHoldEnabled() const;
   void SetRollHoldEnabled(bool enabled);
   bool IsPitchHoldEnabled() const;
   void SetPitchHoldEnabled(bool enabled);
 
+  // Hold settings
   void SetRollHoldSettings(const RollHoldSettings &settings);
   const RollHoldSettings &GetRollHoldSettings() const;
   void SetPitchHoldSettings(const PitchHoldSettings &settings);
   const PitchHoldSettings &GetPitchHoldSettings() const;
 
 private:
+  // Trim management
   bool StoreSolvedTrimResult(const TrimResult &result);
-  void ResetHoldControllers();
-  void UpdateControllerTrimReferences(const TrimResult &result);
+  void ResetControllers();
+  void SyncControllerTrimReferences(const TrimResult &result);
 
+  // Input dependency
+  control::IFlightControlSource &passthroughSource_;
+
+  // Cached trim
   std::optional<TrimResult> trimResult_;
-  RollHoldController rollHold_;
-  PitchHoldController pitchHold_;
-  AirspeedHoldController airspeedHold_;
-  CourseHoldController courseHold_;
-  AltitudeHoldController altitudeHold_;
+
+  // Controller ownership
+  std::vector<std::unique_ptr<Controller>> controllers_;
 };
 } // namespace gnc
+
+#include "application/sim/gnc/Autopilot.inl"

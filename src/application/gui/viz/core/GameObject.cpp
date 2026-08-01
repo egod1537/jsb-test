@@ -7,9 +7,9 @@ GameObject::GameObject(std::string name) : name_(std::move(name)) {}
 
 GameObject::~GameObject() = default;
 
-void GameObject::Update(const UpdateContext &context) {
+void GameObject::Tick(const TickContext &context) {
   for (const auto &component : components_) {
-    component->Update(context);
+    component->OnTick(context);
   }
 }
 

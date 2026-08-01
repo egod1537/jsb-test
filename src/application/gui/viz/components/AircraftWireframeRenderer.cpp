@@ -20,7 +20,7 @@ AircraftWireframeRenderer::AircraftWireframeRenderer()
           {{-1.35F, -0.75F, 0.0F}, {-1.35F, 0.75F, 0.0F}},
       } {}
 
-void AircraftWireframeRenderer::Update(const UpdateContext &context) {
+void AircraftWireframeRenderer::OnTick(const TickContext &context) {
   const auto &state = context.snapshot.aircraftState;
   Transform &transform = GetTransform();
   transform.SetPosition({0.0F, 0.0F, 0.35F});

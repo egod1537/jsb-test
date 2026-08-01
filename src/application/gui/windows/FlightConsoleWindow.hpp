@@ -8,6 +8,6 @@ public:
   FlightConsoleWindow();
 
 protected:
-  void OnUpdate(GUI &gui) override;
+  void OnRender(GUI &gui) override;
 };
 } // namespace gui

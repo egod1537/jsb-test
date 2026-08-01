@@ -8,6 +8,7 @@
 namespace FlightUI {
 class ButtonBuilder {
 public:
+  // Lifetime
   explicit ButtonBuilder(std::string label, Action onClick = {});
   ButtonBuilder(const ButtonBuilder &other);
   ButtonBuilder(ButtonBuilder &&other) noexcept;
@@ -15,6 +16,7 @@ public:
   ButtonBuilder &operator=(ButtonBuilder &&other) noexcept;
   ~ButtonBuilder();
 
+  // Explicit configuration
   ButtonBuilder &SetOnAction(Action onClick);
   ButtonBuilder &SetSize(Vector2 size);
   ButtonBuilder &SetWidth(float width);
@@ -23,6 +25,7 @@ public:
   ButtonBuilder &SetTooltip(std::string tooltip);
   ButtonBuilder &SetId(std::string id);
 
+  // Fluent configuration
   ButtonBuilder &OnAction(Action onClick);
   ButtonBuilder &Size(Vector2 size);
   ButtonBuilder &Width(float width);
@@ -32,9 +35,11 @@ public:
   ButtonBuilder &Tooltip(std::string tooltip);
   ButtonBuilder &Id(std::string id);
 
+  // Element conversion
   operator UIElement() const;
 
 private:
+  // Implementation state
   class Impl;
   std::unique_ptr<Impl> m_Impl;
 };

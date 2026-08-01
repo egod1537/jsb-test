@@ -13,6 +13,11 @@
 
 namespace {
 constexpr const char *GLSL_VERSION = "#version 130";
+constexpr int SWAP_INTERVAL = 1;
+constexpr float CLEAR_COLOR_R = 0.10F;
+constexpr float CLEAR_COLOR_G = 0.11F;
+constexpr float CLEAR_COLOR_B = 0.13F;
+constexpr float CLEAR_COLOR_A = 1.00F;
 } // namespace
 
 namespace gui {
@@ -55,7 +60,7 @@ bool GUI::Start() {
   }
 
   glfwMakeContextCurrent(window_);
-  glfwSwapInterval(config_.vsync ? 1 : 0);
+  glfwSwapInterval(SWAP_INTERVAL);
 
   IMGUI_CHECKVERSION();
 
@@ -89,7 +94,7 @@ bool GUI::Start() {
   return true;
 }
 
-void GUI::Update() {
+void GUI::Tick() {
   if (!initialized_) {
     return;
   }
@@ -177,7 +182,7 @@ void GUI::RenderFrame() {
 
   RenderMainMenuBar();
   RenderDockSpace();
-  UpdateComponents();
+  TickComponents();
 }
 
 void GUI::EndFrame() {
@@ -192,10 +197,10 @@ void GUI::EndFrame() {
   glfwGetFramebufferSize(window_, &displayWidth, &displayHeight);
 
   glViewport(0, 0, displayWidth, displayHeight);
-  glClearColor(config_.clearColorR * config_.clearColorA,
-      config_.clearColorG * config_.clearColorA,
-      config_.clearColorB * config_.clearColorA,
-      config_.clearColorA);
+  glClearColor(CLEAR_COLOR_R * CLEAR_COLOR_A,
+      CLEAR_COLOR_G * CLEAR_COLOR_A,
+      CLEAR_COLOR_B * CLEAR_COLOR_A,
+      CLEAR_COLOR_A);
   glClear(GL_COLOR_BUFFER_BIT);
 
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -203,9 +208,7 @@ void GUI::EndFrame() {
 }
 
 // private
-void GUI::RenderDockSpace() {
-  ImGui::DockSpaceOverViewport();
-}
+void GUI::RenderDockSpace() { ImGui::DockSpaceOverViewport(); }
 
 void GUI::RenderMainMenuBar() {
   if (!ImGui::BeginMainMenuBar()) {
@@ -223,26 +226,36 @@ void GUI::RenderSimulationMenu() {
     return;
   }
 
-  auto &simulation = GetSimulation();
+  auto &executionControl = GetSimulationExecutionControl();
+  const application::SimulationExecutionState executionState =
+      executionControl.GetSimulationExecutionState();
 
-  ImGui::BeginDisabled(!simulation.IsRunning());
+  ImGui::BeginDisabled(
+      executionState != application::SimulationExecutionState::Running);
   if (ImGui::MenuItem("Pause")) {
-    simulation.Pause();
+    executionControl.PauseSimulation();
   }
   ImGui::EndDisabled();
 
-  ImGui::BeginDisabled(!simulation.IsPaused());
+  ImGui::BeginDisabled(
+      executionState != application::SimulationExecutionState::Paused);
   if (ImGui::MenuItem("Resume")) {
-    simulation.Resume();
+    executionControl.ResumeSimulation();
   }
-  if (ImGui::MenuItem("Step Once")) {
-    simulation.RequestStep();
+  if (ImGui::MenuItem("Tick Once")) {
+    executionControl.RequestSimulationTick();
   }
   ImGui::EndDisabled();
 
-  ImGui::BeginDisabled(simulation.IsStopped());
-  if (ImGui::MenuItem("Restart")) {
-    simulation.Restart();
+  ImGui::BeginDisabled(
+      executionState == application::SimulationExecutionState::Stopped);
+  if (ImGui::MenuItem("Reset")) {
+    const bool resumeAfterReset =
+        executionState == application::SimulationExecutionState::Running;
+    executionControl.PauseSimulation();
+    if (executionControl.ResetSimulation() && resumeAfterReset) {
+      executionControl.ResumeSimulation();
+    }
   }
   ImGui::EndDisabled();
 
@@ -289,7 +302,7 @@ void GUI::StartComponents() {
   }
 }
 
-void GUI::UpdateComponents() {
+void GUI::TickComponents() {
   for (const auto &component : components_) {
     component->Tick(*this);
   }

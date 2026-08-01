@@ -11,6 +11,7 @@ using InputDoubleChangedAction = std::function<void(double)>;
 
 class InputDoubleBuilder {
 public:
+  // Lifetime
   InputDoubleBuilder(std::string label, double value);
   InputDoubleBuilder(const InputDoubleBuilder &other);
   InputDoubleBuilder(InputDoubleBuilder &&other) noexcept;
@@ -18,6 +19,7 @@ public:
   InputDoubleBuilder &operator=(InputDoubleBuilder &&other) noexcept;
   ~InputDoubleBuilder();
 
+  // Explicit configuration
   InputDoubleBuilder &SetOnChanged(InputDoubleChangedAction onChanged);
   InputDoubleBuilder &SetStep(double step);
   InputDoubleBuilder &SetFastStep(double step);
@@ -27,6 +29,7 @@ public:
   InputDoubleBuilder &SetTooltip(std::string tooltip);
   InputDoubleBuilder &SetId(std::string id);
 
+  // Fluent configuration
   InputDoubleBuilder &OnChanged(InputDoubleChangedAction onChanged);
   InputDoubleBuilder &Step(double step);
   InputDoubleBuilder &FastStep(double step);
@@ -36,9 +39,11 @@ public:
   InputDoubleBuilder &Tooltip(std::string tooltip);
   InputDoubleBuilder &Id(std::string id);
 
+  // Element conversion
   operator UIElement() const;
 
 private:
+  // Implementation state
   class Impl;
   std::unique_ptr<Impl> m_Impl;
 };

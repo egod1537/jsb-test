@@ -13,10 +13,12 @@ enum class DataType {
 
 class DataView {
 public:
+  // Construction
   DataView();
   DataView(const double *data, std::size_t count);
   DataView(const float *data, std::size_t count);
 
+  // Container views
   static DataView From(const std::vector<double> &values);
   static DataView From(const std::vector<float> &values);
   static DataView From(std::span<const double> values);
@@ -24,11 +26,13 @@ public:
   static DataView From(std::vector<double> &&values) = delete;
   static DataView From(std::vector<float> &&values) = delete;
 
+  // View metadata
   const void *GetData() const;
   std::size_t GetCount() const;
   DataType GetType() const;
 
 private:
+  // Non-owning view
   const void *m_Data;
   std::size_t m_Count;
   DataType m_Type;

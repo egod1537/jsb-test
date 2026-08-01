@@ -10,6 +10,7 @@
 namespace FlightUI {
 class FoldOutBuilder {
 public:
+  // Lifetime
   explicit FoldOutBuilder(std::string label);
   FoldOutBuilder(const FoldOutBuilder &other);
   FoldOutBuilder(FoldOutBuilder &&other) noexcept;
@@ -17,6 +18,7 @@ public:
   FoldOutBuilder &operator=(FoldOutBuilder &&other) noexcept;
   ~FoldOutBuilder();
 
+  // Explicit configuration
   FoldOutBuilder &SetOpen(bool &isOpen);
   FoldOutBuilder &SetDefaultOpen(bool open);
   FoldOutBuilder &SetFlags(ImGuiTreeNodeFlags flags);
@@ -27,6 +29,7 @@ public:
   FoldOutBuilder &SetTooltip(std::string tooltip);
   FoldOutBuilder &SetId(std::string id);
 
+  // Fluent configuration
   FoldOutBuilder &Open(bool &isOpen);
   FoldOutBuilder &DefaultOpen(bool open = true);
   FoldOutBuilder &Flags(ImGuiTreeNodeFlags flags);
@@ -37,11 +40,13 @@ public:
   FoldOutBuilder &Tooltip(std::string tooltip);
   FoldOutBuilder &Id(std::string id);
 
+  // Child content
   UIElement operator[](UIElement child) const;
   UIElement operator[](Children children) const;
   UIElement operator[](ChildrenBuilder children) const;
 
 private:
+  // Implementation state
   class Impl;
   std::unique_ptr<Impl> m_Impl;
 };

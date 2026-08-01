@@ -1,8 +1,6 @@
 #include "FlightGearSender.hpp"
-#include "application/sim/jsbsim/FlightProperties.hpp"
+#include "application/sim/jsbsim/Properties.hpp"
 #include "NetFdmPacket.hpp"
-
-#include <FGFDMExec.h>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -19,9 +17,9 @@
 #include <memory>
 
 namespace {
-flightgear::NetFdmPacket BuildPacket(JSBSim::FGFDMExec &fdm) {
+flightgear::NetFdmPacket BuildPacket(
+    const sim::jsbsim::Properties &properties) {
   flightgear::NetFdmPacket packet{};
-  JSBSim::FlightProperties properties(fdm);
 
   packet.longitude = properties.Get("position/long-gc-rad");
   packet.latitude = properties.Get("position/lat-gc-rad");
@@ -108,12 +106,12 @@ bool FlightGearSender::IsOpen() const {
 #endif
 }
 
-bool FlightGearSender::Send(JSBSim::FGFDMExec &fdm) {
+bool FlightGearSender::Send(const sim::jsbsim::Properties &properties) {
   if (!IsOpen()) {
     return false;
   }
 
-  const auto packet = BuildPacket(fdm);
+  const auto packet = BuildPacket(properties);
   const auto networkPacket = flightgear::ToNetworkOrder(packet);
 
 #ifdef _WIN32

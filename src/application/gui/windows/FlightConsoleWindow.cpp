@@ -8,8 +8,10 @@ namespace UI = FlightUI;
 
 FlightConsoleWindow::FlightConsoleWindow() : Window("Flight Console") {}
 
-void FlightConsoleWindow::OnUpdate(GUI &gui) {
+void FlightConsoleWindow::OnRender(GUI &gui) {
   const sim::SimulationConfig &config = gui.GetSimulation().GetConfig();
+  const sim::InitialCondition &initialCondition =
+      gui.GetSimulation().GetDefaultInitialCondition();
 
   // clang-format off
   FlightUI::UIElement content =
@@ -18,8 +20,8 @@ void FlightConsoleWindow::OnUpdate(GUI &gui) {
         +UI::Heading("JSB Flight Console")
         + UI::Text("Aircraft: " + config.aircraftName)
         + UI::ValueLabel("Simulation", config.simulationHz, "%.1f Hz")
-        + UI::ValueLabel("Initial altitude", config.altitudeFt, "%.0f ft")
-        + UI::ValueLabel("Initial airspeed", config.calibratedAirspeedKts,
+        + UI::ValueLabel("Initial altitude", initialCondition.altitudeFt, "%.0f ft")
+        + UI::ValueLabel("Initial airspeed", initialCondition.airspeedKts,
                          "%.0f kt")
       ];
   // clang-format on

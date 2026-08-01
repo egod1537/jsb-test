@@ -1,79 +1,70 @@
 #pragma once
 
-#include "application/sim/control/ControlInput.hpp"
-#include "application/sim/jsbsim/FlightControls.hpp"
-#include "application/sim/jsbsim/FlightProperties.hpp"
+#include "application/sim/jsbsim/ControlSystem.hpp"
+#include "application/sim/jsbsim/EngineSystem.hpp"
+#include "application/sim/jsbsim/Properties.hpp"
 #include "application/sim/AircraftState.hpp"
-#include "application/sim/EngineState.hpp"
 #include "application/sim/InitialCondition.hpp"
 #include "application/sim/SimulationConfig.h"
 
-#include <cstddef>
 #include <memory>
-#include <vector>
 
 namespace JSBSim {
 class FGFDMExec;
 } // namespace JSBSim
 
+namespace gnc {
+enum class TrimMode;
+struct TrimRequest;
+} // namespace gnc
+
 namespace sim {
 class Aircraft {
 public:
+  // Lifetime and stepping
   Aircraft();
   ~Aircraft();
-
   Aircraft(const Aircraft &) = delete;
   Aircraft &operator=(const Aircraft &) = delete;
+  bool Initialize(const SimulationConfig &config,
+      const InitialCondition &initialCondition);
+  bool Tick();
 
-  bool Initialize(const SimulationConfig &config);
-  bool Step();
-  bool Update();
+  // Initial condition and reset
+  bool ApplyInitialCondition(const InitialCondition &initialCondition);
+  void SetInitialConditionInputs(const InitialCondition &initialCondition);
+  InitialCondition GetCurrentCondition() const;
+  bool Reset(const SimulationConfig &config,
+      const InitialCondition &initialCondition);
+  void ResetSimulationTime();
 
+  // Trim operations
+  bool ApplyTrimInitialCondition(const gnc::TrimRequest &request);
+  void ExecuteTrim(gnc::TrimMode mode);
+
+  // Aircraft state
   AircraftState GetAircraftState() const;
   AircraftStateDerivative GetAircraftStateDerivative() const;
 
-  bool ApplyInitialCondition(const InitialCondition &initialCondition);
-  void SetInitialConditionInputs(const InitialCondition &initialCondition);
-  InitialCondition CaptureCurrentCondition() const;
-  bool Reset(const SimulationConfig &config,
-      const InitialCondition &initialCondition);
-  void ResetControlInput();
-
-  JSBSim::FGFDMExec &GetFDMExec();
-  const JSBSim::FGFDMExec &GetFDMExec() const;
-
-  JSBSim::FlightProperties &GetProperties();
-  const JSBSim::FlightProperties &GetProperties() const;
-
-  JSBSim::FlightControls &GetFlightControls();
-  const JSBSim::FlightControls &GetFlightControls() const;
-
-  const control::ControlInput &GetAircraftControlInput() const;
-  void SetAircraftControlInput(const control::ControlInput &input);
-  bool SetElevatorInput(double value);
-  bool SetAileronInput(double value);
-  bool SetRudderInput(double value);
-  bool SetThrottleInput(double value);
-
-  const control::ControlInput &GetControlInput() const;
-
-  std::size_t GetEngineCount() const;
-  EngineState GetEngineState(std::size_t index) const;
-  std::vector<EngineState> GetEngineStates() const;
-  bool IsAnyEngineRunning() const;
-  bool AreAllEnginesRunning() const;
+  // Flight model interfaces
+  jsbsim::ControlSystem &GetControls();
+  const jsbsim::ControlSystem &GetControls() const;
+  jsbsim::EngineSystem &GetEngines();
+  const jsbsim::EngineSystem &GetEngines() const;
+  jsbsim::Properties &GetProperties();
+  const jsbsim::Properties &GetProperties() const;
 
 private:
+  // JSBSim setup
   void ConfigurePaths();
   bool LoadAircraft(const SimulationConfig &config);
   void ConfigureSimulation(const SimulationConfig &config);
-  void ConfigureInitialConditions(const SimulationConfig &config);
   bool InitializeState();
-  void ApplyControlInput();
 
+  // JSBSim dependencies
   std::unique_ptr<JSBSim::FGFDMExec> fdm_;
-  JSBSim::FlightProperties properties_;
-  JSBSim::FlightControls flightControls_;
-  control::ControlInput controlInput_;
+  jsbsim::ControlSystem controls_;
+  jsbsim::EngineSystem engines_;
+  jsbsim::Properties properties_;
 };
 } // namespace sim

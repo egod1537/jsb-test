@@ -8,6 +8,6 @@ public:
   FlightVizWindow();
 
 protected:
-  void OnUpdate(gui::GUI &gui) override;
+  void OnRender(gui::GUI &gui) override;
 };
 } // namespace gui
