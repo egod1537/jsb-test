@@ -32,8 +32,9 @@ void TelemetryOverlay::Render(RenderContext &context) const {
 
   std::snprintf(line,
       sizeof(line),
-      "Alt AGL %.0f ft  CAS %.1f kt  TAS %.1f m/s",
+      "Alt AGL %.0f ft  Course %.1f deg  CAS %.1f kt  TAS %.1f m/s",
       aircraftState.altitudeAglFt,
+      aircraftState.courseDeg,
       aircraftState.calibratedAirspeedKts,
       aircraftState.trueAirspeedMps);
   drawList.AddText(

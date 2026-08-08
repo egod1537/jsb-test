@@ -37,6 +37,9 @@ public:
   control::ControlInput OnTick(sim::Aircraft &aircraft,
       const sim::Tick &tick) override;
 
+  // Periodic aircraft dynamics
+  void UpdateLinearization(sim::Aircraft &aircraft, const sim::Tick &tick);
+
   // Controller registry
   template <typename T, typename... Args> T *AddController(Args &&...args);
   template <typename T> T *GetController();
@@ -83,7 +86,6 @@ private:
   void SyncControllerTrimReferences(const TrimResult &result);
 
   // Aircraft dynamics
-  void UpdateLinearization(sim::Aircraft &aircraft, const sim::Tick &tick);
   void PollLinearization();
   bool SubmitLinearization(sim::Aircraft &aircraft, double simulationTimeSec);
   void InvalidateLinearization();
@@ -101,7 +103,7 @@ private:
   std::unique_ptr<sim::AsyncAircraftLinearizer> asyncLinearizer_;
   std::optional<LinearizationResult> linearization_;
   std::string linearizationErrorMessage_;
-  std::optional<double> lastLinearizationRequestSimTimeSec_;
+  std::optional<double> lastLinearizationCycleSimTimeSec_;
   std::uint64_t linearizationGeneration_ = 0;
 };
 

@@ -144,8 +144,10 @@ add_executable(
   src/application/sim/gnc/hold/PitchHoldController.cpp
   src/application/sim/gnc/hold/AirspeedHoldController.cpp
   src/application/sim/gnc/hold/CourseHoldController.cpp
+  src/application/sim/gnc/hold/YawDamperController.cpp
   src/application/sim/gnc/hold/AltitudeHoldController.cpp
   src/application/gui/viz/core/Component.cpp
+  src/application/gui/viz/core/FlightPathHistory.cpp
   src/application/gui/viz/core/GameObject.cpp
   src/application/gui/viz/core/Scene.cpp
   src/application/gui/viz/render/CameraComponent.cpp
@@ -287,6 +289,7 @@ add_executable(
   src/application/sim/gnc/hold/PitchHoldController.cpp
   src/application/sim/gnc/hold/AirspeedHoldController.cpp
   src/application/sim/gnc/hold/CourseHoldController.cpp
+  src/application/sim/gnc/hold/YawDamperController.cpp
   src/application/sim/gnc/hold/AltitudeHoldController.cpp
 )
 
@@ -404,6 +407,29 @@ target_include_directories(
 add_test(
   NAME flight_camera_controller_tests
   COMMAND flight_camera_controller_tests
+)
+
+add_executable(
+  flight_path_history_tests
+  tests/FlightPathHistoryTests.cpp
+  src/application/gui/viz/core/FlightPathHistory.cpp
+)
+
+target_compile_features(
+  flight_path_history_tests
+  PRIVATE
+  cxx_std_20
+)
+
+target_include_directories(
+  flight_path_history_tests
+  PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+add_test(
+  NAME flight_path_history_tests
+  COMMAND flight_path_history_tests
 )
 
 target_include_directories(

@@ -7,6 +7,7 @@ FlightControlManager::FlightControlManager() : autopilot_(manualController_) {}
 
 bool FlightControlManager::OnTick(const sim::Tick &tick) {
   sim::Aircraft &aircraft = GetAircraft();
+  autopilot_.UpdateLinearization(aircraft, tick);
   if (const auto input = ProduceControlInput(aircraft, tick)) {
     aircraft.GetControls().SetInput(*input);
   }

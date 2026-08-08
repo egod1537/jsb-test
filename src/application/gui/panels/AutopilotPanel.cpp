@@ -11,6 +11,8 @@ constexpr float AutopilotParameterIndent = 24.0F;
 constexpr float AutopilotParameterSliderWidth = 240.0F;
 constexpr float HoldCaptureButtonWidth = 96.0F;
 constexpr double MinimumPitchNaturalFrequencyRadPerSec = 4.0;
+constexpr double MinimumCourseBandwidthSeparationRatio = 1.1;
+constexpr double MaximumCourseBandwidthSeparationRatio = 20.0;
 
 struct AxisHoldSectionConfig {
   const char *holdLabel = "";
@@ -35,6 +37,7 @@ struct AxisHoldSectionConfig {
   double &naturalFrequencyRadPerSec;
   double minimumNaturalFrequencyRadPerSec = 0.1;
   bool &responseOpen;
+  bool responseEditableWhenDisabled = false;
 };
 
 UI::UIElement MakeAutopilotHoldRow(const char *holdLabel,
@@ -110,7 +113,7 @@ UI::UIElement MakeAxisHoldSection(const AxisHoldSectionConfig &config) {
                                          config.targetValue)
                                      + MakeAxisHoldStatusRow(config);
 
-  if (config.enabled) {
+  if (config.enabled || config.responseEditableWhenDisabled) {
     layout = layout + MakeAxisHoldResponseFoldOut(config);
   }
 
@@ -141,6 +144,7 @@ UI::UIElement MakeRollHoldSection(const AutopilotPanelProps &props) {
       .naturalFrequencySliderId = "##RollHoldNaturalFrequency",
       .naturalFrequencyRadPerSec = state.rollHoldNaturalFrequencyRadPerSec,
       .responseOpen = state.rollHoldResponseOpen,
+      .responseEditableWhenDisabled = true,
   });
 }
 
@@ -192,11 +196,11 @@ UI::UIElement MakeCourseHoldSection(AutopilotPanelState &state) {
                                  0.1,
                                  2.0)
                              + MakeAutopilotParameterSlider(
-                                 "Natural Frequency (rad/s)",
-                                 "##CourseHoldNaturalFrequency",
-                                 state.courseHoldNaturalFrequencyRadPerSec,
-                                 0.01,
-                                 2.0)]];
+                                 "Bandwidth Separation Ratio",
+                                 "##CourseHoldBandwidthSeparation",
+                                 state.courseHoldBandwidthSeparationRatio,
+                                 MinimumCourseBandwidthSeparationRatio,
+                                 MaximumCourseBandwidthSeparationRatio)]];
   }
 
   return layout;

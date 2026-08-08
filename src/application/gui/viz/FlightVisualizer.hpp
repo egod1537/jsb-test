@@ -1,6 +1,7 @@
 #pragma once
 
 #include "application/gui/viz/core/FrameSnapshot.hpp"
+#include "application/gui/viz/core/FlightPathHistory.hpp"
 #include "application/gui/viz/core/Scene.hpp"
 
 struct ImVec2;
@@ -28,10 +29,12 @@ private:
   // Scene setup and interaction
   void BuildScene();
   void HandleInput();
+  void RenderMinimap(ImVec2 min, ImVec2 max);
   void RenderViewOptionsMenu(ImVec2 min, ImVec2 max);
   void ToggleViewMode();
 
   // Aircraft synchronization
+  void SyncFlightPath(const sim::Aircraft &aircraft);
   void SyncGroundScroll(const sim::AircraftState &state);
 
   // Scene state
@@ -43,6 +46,7 @@ private:
   ViewMode viewMode_ = ViewMode::Orbit;
   ViewOptions viewOptions_{};
   Vec3 groundScroll_{};
+  FlightPathHistory flightPathHistory_{};
 
   // Motion cache
   double lastMotionSampleTimeSec_ = 0.0;

@@ -41,7 +41,6 @@ void Autopilot::OnReset() {
 control::ControlInput Autopilot::OnTick(sim::Aircraft &aircraft,
     const sim::Tick &tick) {
   control::ControlInput input = passthroughSource_.OnTick(aircraft, tick);
-  UpdateLinearization(aircraft, tick);
 
   RollHoldController *rollHold = GetController<RollHoldController>();
   const ControlContext context{
@@ -145,24 +144,18 @@ void Autopilot::UpdateLinearization(sim::Aircraft &aircraft,
     const sim::Tick &tick) {
   PollLinearization();
 
-  const auto *rollHold = GetController<RollHoldController>();
-  const auto *pitchHold = GetController<PitchHoldController>();
-  const auto *courseHold = GetController<CourseHoldController>();
-  const bool dynamicsRequired =
-      (rollHold != nullptr && rollHold->IsEnabled())
-      || (pitchHold != nullptr && pitchHold->IsEnabled())
-      || (courseHold != nullptr && courseHold->IsEnabled());
-  if (!dynamicsRequired || asyncLinearizer_->IsBusy()) {
+  if (!lastLinearizationCycleSimTimeSec_
+      || tick.simTimeSec < *lastLinearizationCycleSimTimeSec_) {
+    lastLinearizationCycleSimTimeSec_ = tick.simTimeSec;
     return;
   }
 
-  const bool simulationTimeReset =
-      lastLinearizationRequestSimTimeSec_
-      && tick.simTimeSec < *lastLinearizationRequestSimTimeSec_;
-  const bool refreshDue =
-      !lastLinearizationRequestSimTimeSec_ || simulationTimeReset
-      || tick.simTimeSec - *lastLinearizationRequestSimTimeSec_
-             >= LinearizationRefreshIntervalSec;
+  if (asyncLinearizer_->IsBusy()) {
+    return;
+  }
+
+  const bool refreshDue = tick.simTimeSec - *lastLinearizationCycleSimTimeSec_
+                          >= LinearizationRefreshIntervalSec;
   if (refreshDue) {
     SubmitLinearization(aircraft, tick.simTimeSec);
   }
@@ -205,7 +198,7 @@ bool Autopilot::SubmitLinearization(sim::Aircraft &aircraft,
           aircraft.GetConfig(),
           aircraft.GetCurrentCondition(),
           std::move(sourceState))) {
-    lastLinearizationRequestSimTimeSec_ = simulationTimeSec;
+    lastLinearizationCycleSimTimeSec_ = simulationTimeSec;
     linearizationErrorMessage_.clear();
     return true;
   }
@@ -216,7 +209,7 @@ bool Autopilot::SubmitLinearization(sim::Aircraft &aircraft,
 void Autopilot::InvalidateLinearization() {
   linearization_.reset();
   linearizationErrorMessage_.clear();
-  lastLinearizationRequestSimTimeSec_.reset();
+  lastLinearizationCycleSimTimeSec_.reset();
   ++linearizationGeneration_;
 }
 

@@ -5,11 +5,17 @@
 #include "common/math/Math.hpp"
 
 namespace gnc {
-void CourseHoldController::Reset() { integralCourseErrorRadSec_ = 0.0; }
+void CourseHoldController::Reset() {
+  integralCourseErrorRadSec_ = 0.0;
+  prevError_ = 0.0;
+}
 
 bool CourseHoldController::IsEnabled() const { return enabled_; }
 
-void CourseHoldController::SetEnabled(bool enabled) { enabled_ = enabled; }
+void CourseHoldController::SetEnabled(bool enabled) {
+  enabled_ = enabled;
+  integralCourseErrorRadSec_ = 0.0;
+}
 
 const CourseHoldSettings &CourseHoldController::GetSettings() const {
   return settings_;
@@ -32,15 +38,17 @@ std::optional<double> CourseHoldController::OnTick(
 
   const double error =
       math::DeltaAngleRad(prop.Course().Rad(), settings_.targetCourseRad);
-  integralCourseErrorRadSec_ += tick.dtSec * (error + prevError_) / 2.0f;
+  integralCourseErrorRadSec_ += tick.dtSec * (error + prevError_) / 2.0;
 
-  const double rollWN = context.rollHoldSettings->naturalFrequencyRadPerSec;
-  const double wN = rollWN / settings_.naturalFrequencyRadPerSec;
+  const double rollNaturalFrequencyRadPerSec =
+      context.rollHoldSettings->naturalFrequencyRadPerSec;
+  const double courseNaturalFrequencyRadPerSec =
+      rollNaturalFrequencyRadPerSec / settings_.bandwidthSeparationRatio;
   const double zeta = settings_.dampingRatio;
 
-  const double k0 = wN * vG / g;
+  const double k0 = courseNaturalFrequencyRadPerSec * vG / g;
   const double kP = 2 * zeta * k0;
-  const double kI = wN * k0;
+  const double kI = courseNaturalFrequencyRadPerSec * k0;
   const double newRoll = kP * error + kI * integralCourseErrorRadSec_;
 
   prevError_ = error;

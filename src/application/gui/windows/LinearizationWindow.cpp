@@ -113,8 +113,7 @@ void LinearizationWindow::OnRender(GUI &gui) {
   const gnc::LinearizationResult *result = autopilot.GetLinearizationResult();
   if (result == nullptr) {
     ImGui::TextDisabled("No periodic result is available yet.");
-    ImGui::TextDisabled(
-        "Enable Roll Hold, Pitch Hold, or Course Hold in Autopilot mode.");
+    ImGui::TextDisabled("Waiting for the asynchronous periodic update.");
     return;
   }
 

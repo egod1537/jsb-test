@@ -15,7 +15,7 @@ struct ControlContext;
 struct CourseHoldSettings {
   double targetCourseRad = 0.0;
   double dampingRatio = 0.7;
-  double naturalFrequencyRadPerSec = 0.2;
+  double bandwidthSeparationRatio = 5.0;
 };
 
 class CourseHoldController final : public Controller {

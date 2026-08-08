@@ -26,7 +26,7 @@ struct AutopilotPanelState {
   double pitchHoldNaturalFrequencyRadPerSec = 5.0;
   bool pitchHoldResponseOpen = true;
   double courseHoldDampingRatio = 0.7;
-  double courseHoldNaturalFrequencyRadPerSec = 0.2;
+  double courseHoldBandwidthSeparationRatio = 5.0;
   bool courseHoldResponseOpen = true;
 };
 

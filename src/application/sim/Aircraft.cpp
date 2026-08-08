@@ -108,6 +108,7 @@ AircraftState Aircraft::GetAircraftState() const {
   state.rollDeg = properties_.Roll().Deg();
   state.pitchDeg = properties_.Pitch().Deg();
   state.headingDeg = math::RadToDeg(properties_.Get(CurrentHeadingRad));
+  state.courseDeg = math::Wrap(properties_.Course().Deg(), 0.0, 360.0);
   state.alphaDeg = properties_.Alpha().Deg();
   state.betaDeg = properties_.Beta().Deg();
   state.uMps = properties_.U().Mps();

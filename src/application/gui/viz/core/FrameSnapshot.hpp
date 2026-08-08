@@ -13,6 +13,7 @@ enum class ViewMode {
 struct ViewOptions {
   bool showGroundGrid = true;
   bool showTelemetry = true;
+  bool showMinimap = true;
 };
 
 struct FrameSnapshot {

@@ -38,7 +38,7 @@ gnc::CourseHoldSettings MakeCourseHoldSettings(
   return {
       .targetCourseRad = math::DegToRad(state.courseTargetDeg),
       .dampingRatio = state.courseHoldDampingRatio,
-      .naturalFrequencyRadPerSec = state.courseHoldNaturalFrequencyRadPerSec,
+      .bandwidthSeparationRatio = state.courseHoldBandwidthSeparationRatio,
   };
 }
 

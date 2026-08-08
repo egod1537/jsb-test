@@ -27,6 +27,7 @@ constexpr double HeadingToleranceDeg = 0.5;
 constexpr double TrimInputTolerance = 1.0e-5;
 constexpr double ControlCommandTolerance = 1.0e-6;
 constexpr double MaximumAsyncKickoffSec = 1.0;
+constexpr double ExpectedLinearizationRefreshIntervalSec = 5.0;
 
 void Require(bool condition, const std::string &message) {
   if (!condition) {
@@ -208,6 +209,19 @@ void WaitForAutopilotDynamics(sim::Simulation &simulation,
         "Timed out waiting for asynchronous autopilot dynamics");
     Require(simulation.Tick(),
         "Simulation tick failed while waiting for autopilot dynamics");
+    std::this_thread::yield();
+  }
+}
+
+void WaitForLinearizationResult(sim::Simulation &simulation,
+    gnc::Autopilot &autopilot) {
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(15);
+  while (autopilot.GetLinearizationResult() == nullptr) {
+    Require(std::chrono::steady_clock::now() < deadline,
+        "Timed out waiting for asynchronous linearization");
+    Require(simulation.Tick(),
+        "Simulation tick failed while waiting for linearization");
     std::this_thread::yield();
   }
 }
@@ -540,6 +554,10 @@ void TestAircraftStateAccess() {
       aircraftState.trueAirspeedMps,
       SimTimeTolerance,
       "Flight properties true airspeed mps mismatch");
+  RequireNear(properties.AltitudeAgl().Ft(),
+      aircraftState.altitudeAglFt,
+      SimTimeTolerance,
+      "Aircraft state AGL altitude mismatch");
   RequireNear(properties.U().Mps(),
       aircraftState.uMps,
       SimTimeTolerance,
@@ -592,8 +610,14 @@ void TestNavigationProperties() {
       expectedCourseRad,
       SimTimeTolerance,
       "Course does not match horizontal ground-track direction");
-  const double headingRad =
-      math::DegToRad(aircraft.GetAircraftState().headingDeg);
+  const sim::AircraftState aircraftState = aircraft.GetAircraftState();
+  const double expectedCourseDeg =
+      math::Wrap(math::RadToDeg(expectedCourseRad), 0.0, 360.0);
+  RequireNear(aircraftState.courseDeg,
+      expectedCourseDeg,
+      SimTimeTolerance,
+      "Aircraft state course is not normalized ground track");
+  const double headingRad = math::DegToRad(aircraftState.headingDeg);
   Require(std::fabs(properties.Course().Rad() - headingRad) > 0.1,
       "Course accessor returned aircraft heading instead of ground track");
 
@@ -873,6 +897,49 @@ void TestManualModeIgnoresAutopilotSource() {
       "Manual mode did not apply manual throttle");
 }
 
+void TestLinearizationRunsInManualModeWithoutHolds() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &flightControlManager = GetFlightControlManager(simulation);
+  auto &autopilot = flightControlManager.GetAutopilot();
+  const control::ControlInput manualInput{
+      .elevator = 0.2,
+      .aileron = -0.3,
+      .rudder = 0.1,
+      .throttle = 0.4,
+  };
+
+  flightControlManager.SetMode(control::FlightControlMode::Manual);
+  flightControlManager.GetManualController().SetCommandedInput(manualInput);
+  Require(!autopilot.IsRollHoldEnabled() && !autopilot.IsPitchHoldEnabled()
+              && !autopilot.IsCourseHoldEnabled(),
+      "Always-on linearization test unexpectedly has an active Hold");
+
+  Require(simulation.Tick(), "Linearization scheduling tick failed");
+  const double firstRequestDueSec =
+      GetSimTime(simulation) + ExpectedLinearizationRefreshIntervalSec;
+  while (GetSimTime(simulation) < firstRequestDueSec) {
+    Require(simulation.Tick(),
+        "Simulation tick failed before periodic linearization request");
+  }
+
+  const auto kickoffStart = std::chrono::steady_clock::now();
+  Require(simulation.Tick(), "Manual-mode linearization kickoff tick failed");
+  const double kickoffDurationSec = std::chrono::duration<double>(
+      std::chrono::steady_clock::now() - kickoffStart)
+                                        .count();
+  Require(kickoffDurationSec < MaximumAsyncKickoffSec,
+      "Manual-mode linearization blocked the simulation tick");
+
+  WaitForLinearizationResult(simulation, autopilot);
+  Require(autopilot.GetLinearizationResult() != nullptr,
+      "Manual mode did not publish an asynchronous linearization result");
+  Require(flightControlManager.GetMode() == control::FlightControlMode::Manual,
+      "Linearization changed the active flight-control mode");
+  Require(simulation.GetAircraft().GetControls().GetInput() == manualInput,
+      "Background linearization changed the manual control input");
+}
+
 void TestRollHoldControllerComputesAileronCommand() {
   sim::Simulation simulation;
   StartSimulation(simulation);
@@ -955,7 +1022,7 @@ void TestCourseHoldCommandInterface() {
   const gnc::CourseHoldSettings settings{
       .targetCourseRad = 1.2,
       .dampingRatio = 0.8,
-      .naturalFrequencyRadPerSec = 0.25,
+      .bandwidthSeparationRatio = 5.0,
   };
   autopilot.SetCourseHoldSettings(settings);
   autopilot.SetCourseHoldEnabled(false);
@@ -995,15 +1062,34 @@ void TestCourseHoldCommandInterface() {
       settings.dampingRatio,
       SimTimeTolerance,
       "Course Hold damping ratio was not retained");
-  RequireNear(autopilot.GetCourseHoldSettings().naturalFrequencyRadPerSec,
-      settings.naturalFrequencyRadPerSec,
+  RequireNear(autopilot.GetCourseHoldSettings().bandwidthSeparationRatio,
+      settings.bandwidthSeparationRatio,
       SimTimeTolerance,
-      "Course Hold natural frequency was not retained");
-  Require(
-      courseHold
-          ->OnTick(simulation.GetAircraft(), MakeTestTick(simulation), context)
-          .has_value(),
-      "Enabled Course Hold did not produce a roll command");
+      "Course Hold bandwidth separation ratio was not retained");
+  const sim::Tick tick = MakeTestTick(simulation);
+  const auto &properties = simulation.GetAircraft().GetProperties();
+  const double courseErrorRad =
+      math::DeltaAngleRad(properties.Course().Rad(), settings.targetCourseRad);
+  const double rollNaturalFrequencyRadPerSec =
+      context.rollHoldSettings->naturalFrequencyRadPerSec;
+  const double courseNaturalFrequencyRadPerSec =
+      rollNaturalFrequencyRadPerSec / settings.bandwidthSeparationRatio;
+  Require(courseNaturalFrequencyRadPerSec < rollNaturalFrequencyRadPerSec,
+      "Course Hold bandwidth was not slower than Roll Hold bandwidth");
+  const double gainScale = courseNaturalFrequencyRadPerSec
+                           * properties.GroundSpeed().Mps()
+                           / properties.GravityMps2();
+  const double expectedCommand =
+      2.0 * settings.dampingRatio * gainScale * courseErrorRad
+      + courseNaturalFrequencyRadPerSec * gainScale
+            * (tick.dtSec * courseErrorRad / 2.0);
+  const auto command =
+      courseHold->OnTick(simulation.GetAircraft(), tick, context);
+  Require(command.has_value(), "Enabled Course Hold did not produce a command");
+  RequireNear(*command,
+      expectedCommand,
+      SimTimeTolerance,
+      "Course Hold did not apply the Roll/Course bandwidth separation ratio");
 
   courseHold->Reset();
 }
@@ -1584,6 +1670,7 @@ int main() {
     TestFlightControlManagerOwnsAndRoutesControllers();
     TestFlightControlManagerNoInputPreservesCommand();
     TestManualModeIgnoresAutopilotSource();
+    TestLinearizationRunsInManualModeWithoutHolds();
     TestRollHoldControllerComputesAileronCommand();
     TestCourseHoldCommandInterface();
     TestPitchHoldControllerComputesElevatorCommand();
