@@ -8,6 +8,7 @@
 #include "application/gui/viz/components/TelemetryOverlay.hpp"
 #include "application/gui/viz/render/CameraComponent.hpp"
 #include "application/gui/viz/render/LineCanvas.hpp"
+#include "common/math/Math.hpp"
 #include "flightui/core/UIScale.hpp"
 
 #include <imgui.h>
@@ -191,7 +192,7 @@ void FlightVisualizer::SyncGroundScroll(const sim::AircraftState &state) {
 
   const float distanceViz =
       static_cast<float>(dt) * speedMps / MetersPerVizUnit;
-  const float headingRad = static_cast<float>(state.headingDeg) * DegToRad;
+  const float headingRad = static_cast<float>(math::DegToRad(state.headingDeg));
   const Vec3 forward{std::cos(headingRad), std::sin(headingRad), 0.0F};
 
   groundScroll_ = groundScroll_ - forward * distanceViz;

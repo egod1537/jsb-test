@@ -1,6 +1,7 @@
 #include "application/sim/Aircraft.hpp"
 #include "application/sim/gnc/TrimTypes.hpp"
 #include "application/sim/linearizer/LinearizationResult.hpp"
+#include "common/math/Math.hpp"
 
 #include <FGFDMExec.h>
 #include <cmath>
@@ -23,10 +24,6 @@ constexpr const char *CurrentHeadingRad = "attitude/psi-rad";
 constexpr const char *CurrentPRadPerSec = "velocities/p-rad_sec";
 constexpr const char *CurrentQRadPerSec = "velocities/q-rad_sec";
 constexpr const char *CurrentRRadPerSec = "velocities/r-rad_sec";
-
-constexpr double RadToDeg = 57.295779513082320876;
-
-double RadToDegValue(double value) { return value * RadToDeg; }
 
 bool IsFiniteInitialCondition(const sim::InitialCondition &initialCondition) {
   return std::isfinite(initialCondition.latitudeDeg)
@@ -110,7 +107,7 @@ AircraftState Aircraft::GetAircraftState() const {
   state.trueAirspeedMps = properties_.TrueAirspeed().Mps();
   state.rollDeg = properties_.Roll().Deg();
   state.pitchDeg = properties_.Pitch().Deg();
-  state.headingDeg = RadToDegValue(properties_.Get(CurrentHeadingRad));
+  state.headingDeg = math::RadToDeg(properties_.Get(CurrentHeadingRad));
   state.alphaDeg = properties_.Alpha().Deg();
   state.betaDeg = properties_.Beta().Deg();
   state.uMps = properties_.U().Mps();
@@ -235,14 +232,14 @@ void Aircraft::SetInitialConditionInputs(
 InitialCondition Aircraft::GetCurrentCondition() const {
   InitialCondition initialCondition{};
   initialCondition.latitudeDeg =
-      RadToDegValue(properties_.Get(CurrentLatitudeRad));
+      math::RadToDeg(properties_.Get(CurrentLatitudeRad));
   initialCondition.longitudeDeg =
-      RadToDegValue(properties_.Get(CurrentLongitudeRad));
+      math::RadToDeg(properties_.Get(CurrentLongitudeRad));
   initialCondition.altitudeFt = properties_.Get(CurrentAltitudeAslFt);
-  initialCondition.rollDeg = RadToDegValue(properties_.Get(CurrentRollRad));
-  initialCondition.pitchDeg = RadToDegValue(properties_.Get(CurrentPitchRad));
+  initialCondition.rollDeg = math::RadToDeg(properties_.Get(CurrentRollRad));
+  initialCondition.pitchDeg = math::RadToDeg(properties_.Get(CurrentPitchRad));
   initialCondition.headingDeg =
-      RadToDegValue(properties_.Get(CurrentHeadingRad));
+      math::RadToDeg(properties_.Get(CurrentHeadingRad));
   initialCondition.airspeedKts = properties_.CalibratedAirspeed().Kts();
   initialCondition.pRadPerSec = properties_.Get(CurrentPRadPerSec);
   initialCondition.qRadPerSec = properties_.Get(CurrentQRadPerSec);

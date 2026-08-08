@@ -2,20 +2,11 @@
 #include "application/sim/SimulationConfig.h"
 #include "application/sim/StateLogger.hpp"
 #include "application/sim/linearizer/LinearizationResult.hpp"
+#include "common/math/Math.hpp"
 
-#include <cmath>
 #include <iostream>
 
 namespace {
-double NormalizeHeadingDeg(double headingDeg) {
-  double normalized = std::fmod(headingDeg, 360.0);
-  if (normalized < 0.0) {
-    normalized += 360.0;
-  }
-
-  return normalized;
-}
-
 gnc::TrimRequest TrimRequestFromInitialCondition(
     const sim::InitialCondition &initialCondition) {
   gnc::TrimRequest request{};
@@ -102,7 +93,7 @@ bool Simulation::Reset(const InitialCondition &initialCondition) {
   }
 
   InitialCondition normalized = initialCondition;
-  normalized.headingDeg = NormalizeHeadingDeg(normalized.headingDeg);
+  normalized.headingDeg = math::Wrap(normalized.headingDeg, 0.0, 360.0);
 
   std::string validationError;
   if (!ValidateInitialCondition(normalized, &validationError)) {

@@ -217,6 +217,28 @@ endif()
 enable_testing()
 
 add_executable(
+  math_tests
+  tests/MathTests.cpp
+)
+
+target_compile_features(
+  math_tests
+  PRIVATE
+  cxx_std_20
+)
+
+target_include_directories(
+  math_tests
+  PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+add_test(
+  NAME math_tests
+  COMMAND math_tests
+)
+
+add_executable(
   flightui_tests
   tests/FlightUITests.cpp
 )

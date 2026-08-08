@@ -8,6 +8,7 @@
 #include "application/sim/Simulation.hpp"
 #include "application/sim/control/FlightControlMode.hpp"
 #include "application/sim/gnc/Autopilot.hpp"
+#include "common/math/Math.hpp"
 #include "flightui/FlightUI.hpp"
 
 #include <iostream>
@@ -16,11 +17,9 @@ namespace gui {
 namespace UI = FlightUI;
 
 namespace {
-constexpr double DegToRad = 0.017453292519943295769;
-
 gnc::RollHoldSettings MakeRollHoldSettings(const AutopilotPanelState &state) {
   return {
-      .targetRollRad = state.rollTargetDeg * DegToRad,
+      .targetRollRad = math::DegToRad(state.rollTargetDeg),
       .dampingRatio = state.rollHoldDampingRatio,
       .naturalFrequencyRadPerSec = state.rollHoldNaturalFrequencyRadPerSec,
   };
@@ -28,7 +27,7 @@ gnc::RollHoldSettings MakeRollHoldSettings(const AutopilotPanelState &state) {
 
 gnc::PitchHoldSettings MakePitchHoldSettings(const AutopilotPanelState &state) {
   return {
-      .targetPitchRad = state.pitchTargetDeg * DegToRad,
+      .targetPitchRad = math::DegToRad(state.pitchTargetDeg),
       .dampingRatio = state.pitchHoldDampingRatio,
       .naturalFrequencyRadPerSec = state.pitchHoldNaturalFrequencyRadPerSec,
   };
@@ -37,7 +36,7 @@ gnc::PitchHoldSettings MakePitchHoldSettings(const AutopilotPanelState &state) {
 gnc::CourseHoldSettings MakeCourseHoldSettings(
     const AutopilotPanelState &state) {
   return {
-      .targetCourseRad = state.courseTargetDeg * DegToRad,
+      .targetCourseRad = math::DegToRad(state.courseTargetDeg),
       .dampingRatio = state.courseHoldDampingRatio,
       .naturalFrequencyRadPerSec = state.courseHoldNaturalFrequencyRadPerSec,
   };

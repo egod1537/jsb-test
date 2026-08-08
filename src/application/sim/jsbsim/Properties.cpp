@@ -1,4 +1,5 @@
 #include "application/sim/jsbsim/Properties.hpp"
+#include "common/math/Math.hpp"
 
 #include <FGFDMExec.h>
 
@@ -36,15 +37,10 @@ constexpr const char *RdotRadPerSec2 = "accelerations/rdot-rad_sec2";
 
 constexpr double FeetToMeters = 0.3048;
 constexpr double KnotToFeetPerSec = 1.6878098571011957;
-constexpr double RadToDeg = 57.295779513082320876;
-constexpr double DegToRad = 0.017453292519943295769;
-
 double FeetPerSecToMetersPerSec(double value) { return value * FeetToMeters; }
 double FeetPerSec2ToMetersPerSec2(double value) { return value * FeetToMeters; }
 double FeetPerSecToKts(double value) { return value / KnotToFeetPerSec; }
 double KtsToFeetPerSec(double value) { return value * KnotToFeetPerSec; }
-double RadToDegValue(double value) { return value * RadToDeg; }
-double DegToRadValue(double value) { return value * DegToRad; }
 } // namespace
 
 namespace sim::jsbsim {
@@ -86,7 +82,7 @@ double AngleView::Rad() const {
     return properties_.Get(radPath_);
   }
 
-  return DegToRadValue(Deg());
+  return math::DegToRad(Deg());
 }
 
 double AngleView::Deg() const {
@@ -94,7 +90,7 @@ double AngleView::Deg() const {
     return properties_.Get(degPath_);
   }
 
-  return RadToDegValue(Rad());
+  return math::RadToDeg(Rad());
 }
 
 MutableAngleView::MutableAngleView(Properties &properties, const char *radPath,
@@ -106,7 +102,7 @@ double MutableAngleView::Rad() const {
     return properties_.Get(radPath_);
   }
 
-  return DegToRadValue(Deg());
+  return math::DegToRad(Deg());
 }
 
 double MutableAngleView::Deg() const {
@@ -114,7 +110,7 @@ double MutableAngleView::Deg() const {
     return properties_.Get(degPath_);
   }
 
-  return RadToDegValue(Rad());
+  return math::RadToDeg(Rad());
 }
 
 void MutableAngleView::SetRad(double value) const {
@@ -124,7 +120,7 @@ void MutableAngleView::SetRad(double value) const {
   }
 
   if (degPath_ != nullptr) {
-    properties_.Set(degPath_, RadToDegValue(value));
+    properties_.Set(degPath_, math::RadToDeg(value));
   }
 }
 
@@ -135,7 +131,7 @@ void MutableAngleView::SetDeg(double value) const {
   }
 
   if (radPath_ != nullptr) {
-    properties_.Set(radPath_, DegToRadValue(value));
+    properties_.Set(radPath_, math::DegToRad(value));
   }
 }
 
@@ -148,14 +144,16 @@ double AngularRateView::RadPerSec() const {
   return properties_.Get(rateRadPerSecPath_);
 }
 
-double AngularRateView::DegPerSec() const { return RadToDegValue(RadPerSec()); }
+double AngularRateView::DegPerSec() const {
+  return math::RadToDeg(RadPerSec());
+}
 
 double AngularRateView::DotRadPerSec2() const {
   return properties_.Get(dotRadPerSec2Path_);
 }
 
 double AngularRateView::DotDegPerSec2() const {
-  return RadToDegValue(DotRadPerSec2());
+  return math::RadToDeg(DotRadPerSec2());
 }
 
 LinearVelocityView::LinearVelocityView(const Properties &properties,

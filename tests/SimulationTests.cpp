@@ -7,6 +7,7 @@
 #include "application/sim/gnc/hold/AltitudeHoldController.hpp"
 #include "application/sim/control/FlightControlManager.hpp"
 #include "application/sim/control/FlightControlMode.hpp"
+#include "common/math/Math.hpp"
 
 #include <algorithm>
 #include <array>
@@ -25,7 +26,6 @@ constexpr double AirspeedToleranceKts = 0.5;
 constexpr double HeadingToleranceDeg = 0.5;
 constexpr double TrimInputTolerance = 1.0e-5;
 constexpr double ControlCommandTolerance = 1.0e-6;
-constexpr double DegToRad = 0.017453292519943295769;
 constexpr double MaximumAsyncKickoffSec = 1.0;
 
 void Require(bool condition, const std::string &message) {
@@ -521,19 +521,19 @@ void TestAircraftStateAccess() {
   Require(std::isfinite(derivative.uDotMps2),
       "Aircraft state derivative uDot invalid");
   RequireNear(properties.Roll().Rad(),
-      aircraftState.rollDeg * DegToRad,
+      math::DegToRad(aircraftState.rollDeg),
       SimTimeTolerance,
       "Flight properties roll rad mismatch");
   RequireNear(properties.Pitch().Rad(),
-      aircraftState.pitchDeg * DegToRad,
+      math::DegToRad(aircraftState.pitchDeg),
       SimTimeTolerance,
       "Flight properties pitch rad mismatch");
   RequireNear(properties.P().RadPerSec(),
-      aircraftState.pDegPerSec * DegToRad,
+      math::DegToRad(aircraftState.pDegPerSec),
       SimTimeTolerance,
       "Flight properties roll rate rad mismatch");
   RequireNear(properties.P().DotRadPerSec2(),
-      derivative.pDotDegPerSec2 * DegToRad,
+      math::DegToRad(derivative.pDotDegPerSec2),
       SimTimeTolerance,
       "Flight properties roll acceleration rad mismatch");
   RequireNear(properties.TrueAirspeed().Mps(),
@@ -592,7 +592,8 @@ void TestNavigationProperties() {
       expectedCourseRad,
       SimTimeTolerance,
       "Course does not match horizontal ground-track direction");
-  const double headingRad = aircraft.GetAircraftState().headingDeg * DegToRad;
+  const double headingRad =
+      math::DegToRad(aircraft.GetAircraftState().headingDeg);
   Require(std::fabs(properties.Course().Rad() - headingRad) > 0.1,
       "Course accessor returned aircraft heading instead of ground track");
 
@@ -999,10 +1000,10 @@ void TestCourseHoldCommandInterface() {
       SimTimeTolerance,
       "Course Hold natural frequency was not retained");
   Require(
-      !courseHold
+      courseHold
           ->OnTick(simulation.GetAircraft(), MakeTestTick(simulation), context)
           .has_value(),
-      "Course Hold control law should remain unimplemented");
+      "Enabled Course Hold did not produce a roll command");
 
   courseHold->Reset();
 }

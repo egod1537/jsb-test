@@ -2,6 +2,7 @@
 #include "application/sim/Aircraft.hpp"
 #include "application/sim/Tick.hpp"
 #include "application/sim/gnc/ControlContext.hpp"
+#include "common/math/Math.hpp"
 
 namespace gnc {
 void CourseHoldController::Reset() { integralCourseErrorRadSec_ = 0.0; }
@@ -29,7 +30,8 @@ std::optional<double> CourseHoldController::OnTick(
   const double vG = prop.GroundSpeed().Mps();
   const double g = prop.GravityMps2();
 
-  const double error = settings_.targetCourseRad - prop.Course().Rad();
+  const double error =
+      math::DeltaAngleRad(prop.Course().Rad(), settings_.targetCourseRad);
   integralCourseErrorRadSec_ += tick.dtSec * (error + prevError_) / 2.0f;
 
   const double rollWN = context.rollHoldSettings->naturalFrequencyRadPerSec;

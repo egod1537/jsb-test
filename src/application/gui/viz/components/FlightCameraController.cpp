@@ -1,16 +1,17 @@
 #include "application/gui/viz/components/FlightCameraController.hpp"
 
 #include "application/gui/viz/render/CameraComponent.hpp"
+#include "common/math/Math.hpp"
 
 #include <algorithm>
 
 namespace {
 viz::Vec3 AircraftForward(const sim::AircraftState &state) {
   viz::Vec3 forward{1.0F, 0.0F, 0.0F};
-  forward = viz::RotateY(forward, -static_cast<float>(state.pitchDeg) *
-                                      viz::DegToRad);
-  forward =
-      viz::RotateZ(forward, static_cast<float>(state.headingDeg) * viz::DegToRad);
+  forward = viz::RotateY(forward,
+      -static_cast<float>(math::DegToRad(state.pitchDeg)));
+  forward = viz::RotateZ(forward,
+      static_cast<float>(math::DegToRad(state.headingDeg)));
   return viz::Normalize(forward);
 }
 } // namespace
@@ -50,9 +51,8 @@ void FlightCameraController::ApplyThirdPersonCamera(
   const Vec3 forward = AircraftForward(context.snapshot.aircraftState);
   const float altitude = std::max(context.snapshot.visualAltitude, 0.35F);
   const float chaseDistance = 7.0F + std::min(altitude * 0.22F, 9.0F);
-  const Vec3 eye =
-      aircraftPosition - forward * chaseDistance
-      + Vec3{0.0F, 0.0F, 2.4F + std::min(altitude * 0.06F, 4.0F)};
+  const Vec3 eye = aircraftPosition - forward * chaseDistance
+                   + Vec3{0.0F, 0.0F, 2.4F + std::min(altitude * 0.06F, 4.0F)};
   const Vec3 target = aircraftPosition + forward * 4.0F;
 
   camera_->SetEye(eye);
