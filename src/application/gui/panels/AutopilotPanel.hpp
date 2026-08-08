@@ -18,13 +18,13 @@ struct AutopilotPanelState {
   double altitudeTargetFt = 1000.0;
   double courseTargetDeg = 0.0;
 
-  // Controller tuning
-  double rollHoldKp = 0.5;
-  double rollHoldKd = 2.0;
-  bool rollHoldGainsOpen = true;
-  double pitchHoldKp = 0.5;
-  double pitchHoldKd = 2.0;
-  bool pitchHoldGainsOpen = true;
+  // Desired response
+  double rollHoldDampingRatio = 0.7;
+  double rollHoldNaturalFrequencyRadPerSec = 1.0;
+  bool rollHoldResponseOpen = true;
+  double pitchHoldDampingRatio = 0.7;
+  double pitchHoldNaturalFrequencyRadPerSec = 5.0;
+  bool pitchHoldResponseOpen = true;
 };
 
 struct AutopilotPanelProps {
@@ -35,6 +35,7 @@ struct AutopilotPanelProps {
   double currentRollRateDegPerSec = 0.0;
   double currentAileron = 0.0;
   bool rollHoldActive = false;
+  bool rollHoldPreparing = false;
   std::function<void()> captureCurrentRoll;
 
   // Pitch telemetry and actions
@@ -42,6 +43,7 @@ struct AutopilotPanelProps {
   double currentPitchRateDegPerSec = 0.0;
   double currentElevator = 0.0;
   bool pitchHoldActive = false;
+  bool pitchHoldPreparing = false;
   std::function<void()> captureCurrentPitch;
 };
 

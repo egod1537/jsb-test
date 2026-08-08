@@ -117,6 +117,11 @@ add_executable(
   src/application/Application.cpp
   src/application/input/Input.cpp
   src/application/sim/Aircraft.cpp
+  src/application/sim/linearizer/AsyncAircraftLinearizer.cpp
+  src/application/sim/linearizer/AircraftLinearizer.cpp
+  src/application/sim/linearizer/LinearizationResult.cpp
+  src/application/sim/linearizer/LinearizationPerturbation.cpp
+  src/application/sim/linearizer/LinearizationStateVector.cpp
   src/application/sim/Component.cpp
   src/application/sim/ErrorTracker.cpp
   src/application/sim/InitialCondition.cpp
@@ -156,6 +161,7 @@ add_executable(
   src/application/sim/jsbsim/ControlSystem.cpp
   src/application/sim/jsbsim/Properties.cpp
   src/application/sim/jsbsim/EngineSystem.cpp
+  src/application/sim/jsbsim/FDMStateAccess.cpp
   src/application/flightgear/FlightGearSender.cpp
   src/application/flightgear/FlightGearSystem.cpp
   src/application/sim/Simulation.cpp
@@ -213,6 +219,11 @@ add_executable(
   src/application/input/Input.cpp
   src/application/sim/Simulation.cpp
   src/application/sim/Aircraft.cpp
+  src/application/sim/linearizer/AsyncAircraftLinearizer.cpp
+  src/application/sim/linearizer/AircraftLinearizer.cpp
+  src/application/sim/linearizer/LinearizationResult.cpp
+  src/application/sim/linearizer/LinearizationPerturbation.cpp
+  src/application/sim/linearizer/LinearizationStateVector.cpp
   src/application/sim/Component.cpp
   src/application/sim/ErrorTracker.cpp
   src/application/sim/InitialCondition.cpp
@@ -220,6 +231,7 @@ add_executable(
   src/application/sim/jsbsim/ControlSystem.cpp
   src/application/sim/jsbsim/Properties.cpp
   src/application/sim/jsbsim/EngineSystem.cpp
+  src/application/sim/jsbsim/FDMStateAccess.cpp
   src/application/sim/control/ManualFlightControlController.cpp
   src/application/sim/control/FlightControlManager.cpp
   src/application/sim/gnc/TrimSolver.cpp
@@ -253,6 +265,72 @@ target_link_libraries(
 add_test(
   NAME simulation_tests
   COMMAND simulation_tests
+)
+
+add_executable(
+  linearization_perturbation_tests
+  tests/LinearizationPerturbationTests.cpp
+  src/application/sim/linearizer/LinearizationPerturbation.cpp
+)
+
+target_compile_features(
+  linearization_perturbation_tests
+  PRIVATE
+  cxx_std_20
+)
+
+target_include_directories(
+  linearization_perturbation_tests
+  PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(
+  linearization_perturbation_tests
+  PRIVATE
+  Eigen3::Eigen
+)
+
+add_test(
+  NAME linearization_perturbation_tests
+  COMMAND linearization_perturbation_tests
+)
+
+add_executable(
+  linearization_state_vector_tests
+  tests/LinearizationStateVectorTests.cpp
+  src/application/sim/Aircraft.cpp
+  src/application/sim/InitialCondition.cpp
+  src/application/sim/jsbsim/ControlSystem.cpp
+  src/application/sim/jsbsim/EngineSystem.cpp
+  src/application/sim/jsbsim/FDMStateAccess.cpp
+  src/application/sim/jsbsim/Properties.cpp
+  src/application/sim/linearizer/LinearizationResult.cpp
+  src/application/sim/linearizer/LinearizationStateVector.cpp
+)
+
+target_compile_features(
+  linearization_state_vector_tests
+  PRIVATE
+  cxx_std_20
+)
+
+target_include_directories(
+  linearization_state_vector_tests
+  PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(
+  linearization_state_vector_tests
+  PRIVATE
+  Eigen3::Eigen
+  libJSBSim
+)
+
+add_test(
+  NAME linearization_state_vector_tests
+  COMMAND linearization_state_vector_tests
 )
 
 target_include_directories(

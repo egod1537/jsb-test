@@ -26,8 +26,8 @@ bool HasPrintfConversion(std::string_view spec) {
     return false;
   }
 
-  constexpr std::string_view conversions = "diuoxXfFeEgGaAcsp";
-  return conversions.find(spec.back()) != std::string_view::npos;
+  constexpr std::string_view Conversions = "diuoxXfFeEgGaAcsp";
+  return Conversions.find(spec.back()) != std::string_view::npos;
 }
 
 std::string NormalizeFormat(std::string format, ValueType valueType) {

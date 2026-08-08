@@ -1,5 +1,6 @@
 #include "application/sim/gnc/hold/PitchHoldController.hpp"
 #include "application/sim/Aircraft.hpp"
+#include "application/sim/gnc/ControlContext.hpp"
 #include "application/sim/jsbsim/Properties.hpp"
 
 namespace gnc {
@@ -24,17 +25,23 @@ void PitchHoldController::SetTrimElevator(double trimElevator) {
 }
 
 std::optional<double> PitchHoldController::OnTick(const sim::Aircraft &aircraft,
-    const sim::Tick &) {
+    const sim::Tick &, const ControlContext &context) {
   if (!enabled_) {
     return std::nullopt;
   }
 
   const sim::jsbsim::Properties &prop = aircraft.GetProperties();
+  const auto &[aTheta1, aTheta2, aTheta3] = *context.pitchDynamics;
+
+  const double wN = settings_.naturalFrequencyRadPerSec;
+  const double zeta = settings_.dampingRatio;
+
+  const double kP = (wN * wN - aTheta2) / aTheta3;
+  const double kD = (2 * zeta * wN - aTheta1) / aTheta3;
 
   const double error = settings_.targetPitchRad - prop.Pitch().Rad();
-  const double newElevator = GetTrimElevator()
-                             - settings_.proportionalGain * error
-                             + settings_.derivativeGain * prop.Q().RadPerSec();
+  const double newElevator =
+      GetTrimElevator() + kP * error - kD * prop.Q().RadPerSec();
 
   return newElevator;
 }

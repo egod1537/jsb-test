@@ -16,9 +16,9 @@ protected:
   // Lifecycle
   virtual bool OnInitialize() { return true; }
   virtual bool OnReset() { return true; }
-  virtual bool OnPreTick(const Tick &) { return true; }
-  virtual bool OnTick(const Tick &) { return true; }
-  virtual bool OnPostTick(const Tick &) { return true; }
+  virtual bool OnPreTick(const Tick &tick) { return true; }
+  virtual bool OnTick(const Tick &tick) { return true; }
+  virtual bool OnPostTick(const Tick &tick) { return true; }
   virtual void OnShutdown() {}
 
   // Owner-provided dependencies

@@ -12,8 +12,8 @@ public:
   FlightGearSender();
   ~FlightGearSender();
 
-  FlightGearSender(const FlightGearSender &) = delete;
-  FlightGearSender &operator=(const FlightGearSender &) = delete;
+  FlightGearSender(const FlightGearSender &other) = delete;
+  FlightGearSender &operator=(const FlightGearSender &other) = delete;
 
   bool IsOpen() const;
   bool Send(const sim::jsbsim::Properties &properties);

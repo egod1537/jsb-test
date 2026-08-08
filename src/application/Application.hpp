@@ -20,9 +20,9 @@ public:
   // Lifetime and main loop
   Application() = default;
   ~Application();
-  Application(std::unique_ptr<gui::GUI>, std::unique_ptr<sim::Simulation>,
-      sim::SimulationConfig);
-  bool Run(const volatile std::sig_atomic_t &);
+  Application(std::unique_ptr<gui::GUI> gui,
+      std::unique_ptr<sim::Simulation> sim, sim::SimulationConfig simConfig);
+  bool Run(const volatile std::sig_atomic_t &running);
 
   // Simulation execution control
   application::SimulationExecutionState
@@ -32,6 +32,10 @@ public:
   void PauseSimulation() override;
   void ResumeSimulation() override;
   void RequestSimulationTick() override;
+  double GetAutomaticSimulationHz() const override {
+    return automaticSimulationHz_;
+  }
+  void SetAutomaticSimulationHz(double hz) override;
   bool ResetSimulation() override;
   bool ResetSimulation(const sim::InitialCondition &initialCondition) override;
   std::uint32_t GetPendingSimulationTickCount() const override {
@@ -56,5 +60,6 @@ private:
   // Execution state
   application::SimulationExecutionState simulationExecutionState_ =
       application::SimulationExecutionState::Stopped;
+  double automaticSimulationHz_ = sim::DefaultSimulationHz;
   std::uint32_t pendingSimulationTicks_ = 0;
 };

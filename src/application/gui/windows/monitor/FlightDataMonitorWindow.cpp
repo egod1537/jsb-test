@@ -13,6 +13,7 @@
 #include <imgui.h>
 
 #include <cstddef>
+#include <utility>
 
 namespace gui {
 namespace UI = FlightUI;
@@ -22,7 +23,9 @@ constexpr float PlotHeight = 245.0f;
 constexpr float ValueSpacing = 24.0f;
 constexpr float PlotGridMinColumnWidth = 430.0f;
 constexpr float PlotGridColumnSpacing = 8.0f;
+constexpr float PlotSelectorButtonWidth = 96.0f;
 constexpr std::size_t VisiblePlotSampleCount = 300;
+constexpr double MetersPerSecondToKnots = 1.9438444924406048;
 
 struct TimeRange {
   double Min = 0.0;
@@ -52,9 +55,18 @@ FlightDataMonitorWindow::FlightDataMonitorWindow()
     : gui::Window("Monitor"), timeHistory_(VisiblePlotSampleCount),
       alphaDegHistory_(VisiblePlotSampleCount),
       betaDegHistory_(VisiblePlotSampleCount),
+      rollDegHistory_(VisiblePlotSampleCount),
+      pitchDegHistory_(VisiblePlotSampleCount),
+      headingDegHistory_(VisiblePlotSampleCount),
+      uMpsHistory_(VisiblePlotSampleCount),
+      vMpsHistory_(VisiblePlotSampleCount),
+      wMpsHistory_(VisiblePlotSampleCount),
       pDegPerSecHistory_(VisiblePlotSampleCount),
       qDegPerSecHistory_(VisiblePlotSampleCount),
       rDegPerSecHistory_(VisiblePlotSampleCount),
+      calibratedAirspeedKtsHistory_(VisiblePlotSampleCount),
+      trueAirspeedKtsHistory_(VisiblePlotSampleCount),
+      altitudeAglFtHistory_(VisiblePlotSampleCount),
       uDotMps2History_(VisiblePlotSampleCount),
       vDotMps2History_(VisiblePlotSampleCount),
       wDotMps2History_(VisiblePlotSampleCount),
@@ -89,6 +101,47 @@ UI::UIElement FlightDataMonitorWindow::DrawAerodynamicAnglesPlot() const {
           offset);
 }
 
+UI::UIElement FlightDataMonitorWindow::DrawAttitudePlot() const {
+  const int offset = timeHistory_.offset();
+  const TimeRange timeRange = GetFocusedTimeRange(timeHistory_);
+
+  return UI::Plot("Attitude")
+      .Height(PlotHeight)
+      .FixedView()
+      .XAxisLimitsAlways(timeRange.Min, timeRange.Max)
+      .FocusedYAxis()
+      .XAxisLabel("Time (s)")
+      .YAxisLabel("deg")
+      .AddLine("roll",
+          timeHistory_.data_view(),
+          rollDegHistory_.data_view(),
+          offset)
+      .AddLine("pitch",
+          timeHistory_.data_view(),
+          pitchDegHistory_.data_view(),
+          offset)
+      .AddLine("heading",
+          timeHistory_.data_view(),
+          headingDegHistory_.data_view(),
+          offset);
+}
+
+UI::UIElement FlightDataMonitorWindow::DrawBodyVelocitiesPlot() const {
+  const int offset = timeHistory_.offset();
+  const TimeRange timeRange = GetFocusedTimeRange(timeHistory_);
+
+  return UI::Plot("Body Velocities")
+      .Height(PlotHeight)
+      .FixedView()
+      .XAxisLimitsAlways(timeRange.Min, timeRange.Max)
+      .FocusedYAxis()
+      .XAxisLabel("Time (s)")
+      .YAxisLabel("m/s")
+      .AddLine("u", timeHistory_.data_view(), uMpsHistory_.data_view(), offset)
+      .AddLine("v", timeHistory_.data_view(), vMpsHistory_.data_view(), offset)
+      .AddLine("w", timeHistory_.data_view(), wMpsHistory_.data_view(), offset);
+}
+
 UI::UIElement FlightDataMonitorWindow::DrawBodyRatesPlot() const {
   const int offset = timeHistory_.offset();
   const TimeRange timeRange = GetFocusedTimeRange(timeHistory_);
@@ -111,6 +164,44 @@ UI::UIElement FlightDataMonitorWindow::DrawBodyRatesPlot() const {
       .AddLine("r",
           timeHistory_.data_view(),
           rDegPerSecHistory_.data_view(),
+          offset);
+}
+
+UI::UIElement FlightDataMonitorWindow::DrawAirspeedPlot() const {
+  const int offset = timeHistory_.offset();
+  const TimeRange timeRange = GetFocusedTimeRange(timeHistory_);
+
+  return UI::Plot("Airspeed")
+      .Height(PlotHeight)
+      .FixedView()
+      .XAxisLimitsAlways(timeRange.Min, timeRange.Max)
+      .FocusedYAxis()
+      .XAxisLabel("Time (s)")
+      .YAxisLabel("kt")
+      .AddLine("calibrated",
+          timeHistory_.data_view(),
+          calibratedAirspeedKtsHistory_.data_view(),
+          offset)
+      .AddLine("true",
+          timeHistory_.data_view(),
+          trueAirspeedKtsHistory_.data_view(),
+          offset);
+}
+
+UI::UIElement FlightDataMonitorWindow::DrawAltitudePlot() const {
+  const int offset = timeHistory_.offset();
+  const TimeRange timeRange = GetFocusedTimeRange(timeHistory_);
+
+  return UI::Plot("Altitude AGL")
+      .Height(PlotHeight)
+      .FixedView()
+      .XAxisLimitsAlways(timeRange.Min, timeRange.Max)
+      .FocusedYAxis()
+      .XAxisLabel("Time (s)")
+      .YAxisLabel("ft")
+      .AddLine("altitude",
+          timeHistory_.data_view(),
+          altitudeAglFtHistory_.data_view(),
           offset);
 }
 
@@ -167,22 +258,57 @@ UI::UIElement FlightDataMonitorWindow::DrawAngularAccelerationsPlot() const {
 void FlightDataMonitorWindow::DrawCurrentValues(
     const sim::AircraftState &state) const {
   UI::HorizontalLayout()
-      .Spacing(ValueSpacing)
-          [+UI::ValueLabel("Sim Time", state.simulationTimeSec, "{:.2f}")
-              + UI::ValueLabel("u (m/s)", state.uMps, "{:.2f}")
-              + UI::ValueLabel("v (m/s)", state.vMps, "{:.2f}")
-              + UI::ValueLabel("w (m/s)", state.wMps, "{:.2f}")]
+      .Spacing(ValueSpacing)[+UI::ValueLabel("Sim Time",
+                                 state.simulationTimeSec,
+                                 "{:.2f}")
+                             + UI::ValueLabel("u (m/s)", state.uMps, "{:.2f}")
+                             + UI::ValueLabel("v (m/s)", state.vMps, "{:.2f}")
+                             + UI::ValueLabel("w (m/s)", state.wMps, "{:.2f}")]
       .Render();
 }
 
+void FlightDataMonitorWindow::DrawPlotSelector() {
+  ImGui::PushID("MonitorPlotSelector");
+
+  if (ImGui::Button("Plots", ImVec2(PlotSelectorButtonWidth, 0.0f))) {
+    ImGui::OpenPopup("PlotOptions");
+  }
+
+  if (ImGui::BeginPopup("PlotOptions")) {
+    ImGui::TextDisabled("Visible plots");
+    ImGui::Separator();
+    ImGui::Checkbox("Aerodynamic Angles", &plotVisibility_.aerodynamicAngles);
+    ImGui::Checkbox("Attitude", &plotVisibility_.attitude);
+    ImGui::Checkbox("Body Velocities", &plotVisibility_.bodyVelocities);
+    ImGui::Checkbox("Body Rates", &plotVisibility_.bodyRates);
+    ImGui::Checkbox("Airspeed", &plotVisibility_.airspeed);
+    ImGui::Checkbox("Altitude AGL", &plotVisibility_.altitude);
+    ImGui::Checkbox("Body Accelerations", &plotVisibility_.bodyAccelerations);
+    ImGui::Checkbox("Angular Accelerations",
+        &plotVisibility_.angularAccelerations);
+    ImGui::EndPopup();
+  }
+
+  ImGui::PopID();
+}
+
 void FlightDataMonitorWindow::DrawPlotGrid() const {
+  if (!plotVisibility_.aerodynamicAngles && !plotVisibility_.attitude
+      && !plotVisibility_.bodyVelocities && !plotVisibility_.bodyRates
+      && !plotVisibility_.airspeed && !plotVisibility_.altitude
+      && !plotVisibility_.bodyAccelerations
+      && !plotVisibility_.angularAccelerations) {
+    ImGui::TextDisabled("No plots selected.");
+    return;
+  }
+
   const float availableWidth = ImGui::GetContentRegionAvail().x;
   const int columnCount =
       availableWidth >= PlotGridMinColumnWidth * 2.0f ? 2 : 1;
-  constexpr ImGuiTableFlags flags =
+  constexpr ImGuiTableFlags Flags =
       ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings;
 
-  if (!ImGui::BeginTable("MonitorPlotGrid", columnCount, flags)) {
+  if (!ImGui::BeginTable("MonitorPlotGrid", columnCount, Flags)) {
     return;
   }
 
@@ -190,50 +316,60 @@ void FlightDataMonitorWindow::DrawPlotGrid() const {
     ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthStretch);
   }
 
-  const FlightUI::UIElement plots[] = {
-      UI::FoldOut("Aerodynamic Angles")
-          .DefaultOpen()
-          .Framed()
-          .SpanAvailWidth()[DrawAerodynamicAnglesPlot()],
-      UI::FoldOut("Body Rates")
-          .DefaultOpen()
-          .Framed()
-          .SpanAvailWidth()[DrawBodyRatesPlot()],
-      UI::FoldOut("Body Accelerations")
-          .DefaultOpen()
-          .Framed()
-          .SpanAvailWidth()[DrawBodyAccelerationsPlot()],
-      UI::FoldOut("Angular Accelerations")
-          .DefaultOpen()
-          .Framed()
-          .SpanAvailWidth()[DrawAngularAccelerationsPlot()],
-  };
-
-  for (std::size_t plotIndex = 0; plotIndex < std::size(plots);
-       ++plotIndex) {
+  std::size_t plotIndex = 0;
+  const auto renderPlot = [&](const char *title, UI::UIElement plot) {
     if (plotIndex % static_cast<std::size_t>(columnCount) == 0U) {
       ImGui::TableNextRow();
     }
 
     ImGui::TableNextColumn();
-    ImGui::PushStyleVar(
-        ImGuiStyleVar_ItemSpacing, ImVec2(PlotGridColumnSpacing, 8.0f));
-    plots[plotIndex].Render();
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+        ImVec2(PlotGridColumnSpacing, 8.0f));
+    UI::FoldOut(title)
+        .DefaultOpen()
+        .Framed()
+        .SpanAvailWidth()[std::move(plot)]
+        .Render();
     ImGui::PopStyleVar();
+    ++plotIndex;
+  };
+
+  if (plotVisibility_.aerodynamicAngles) {
+    renderPlot("Aerodynamic Angles", DrawAerodynamicAnglesPlot());
+  }
+  if (plotVisibility_.attitude) {
+    renderPlot("Attitude", DrawAttitudePlot());
+  }
+  if (plotVisibility_.bodyVelocities) {
+    renderPlot("Body Velocities", DrawBodyVelocitiesPlot());
+  }
+  if (plotVisibility_.bodyRates) {
+    renderPlot("Body Rates", DrawBodyRatesPlot());
+  }
+  if (plotVisibility_.airspeed) {
+    renderPlot("Airspeed", DrawAirspeedPlot());
+  }
+  if (plotVisibility_.altitude) {
+    renderPlot("Altitude AGL", DrawAltitudePlot());
+  }
+  if (plotVisibility_.bodyAccelerations) {
+    renderPlot("Body Accelerations", DrawBodyAccelerationsPlot());
+  }
+  if (plotVisibility_.angularAccelerations) {
+    renderPlot("Angular Accelerations", DrawAngularAccelerationsPlot());
   }
 
   ImGui::EndTable();
 }
 
-void FlightDataMonitorWindow::DrawWindow(sim::Simulation &sim) const {
-  const sim::AircraftState aircraftState =
-      sim.GetAircraft().GetAircraftState();
+void FlightDataMonitorWindow::DrawWindow(sim::Simulation &sim) {
+  const sim::AircraftState aircraftState = sim.GetAircraft().GetAircraftState();
 
   UI::VerticalLayout()
-      .Spacing(
-          8.0f)[+UI::Custom(
-                    [this, aircraftState] { DrawCurrentValues(aircraftState); })
-                + UI::Custom([this] { DrawPlotGrid(); })]
+      .Spacing(8.0f)[+UI::Custom([this, aircraftState] {
+        DrawCurrentValues(aircraftState);
+      }) + UI::Custom([this] { DrawPlotSelector(); })
+                     + UI::Custom([this] { DrawPlotGrid(); })]
       .Render();
 }
 
@@ -245,9 +381,19 @@ void FlightDataMonitorWindow::OnRecordSamples(sim::Simulation &sim) {
   timeHistory_.push_back(state.simulationTimeSec);
   alphaDegHistory_.push_back(state.alphaDeg);
   betaDegHistory_.push_back(state.betaDeg);
+  rollDegHistory_.push_back(state.rollDeg);
+  pitchDegHistory_.push_back(state.pitchDeg);
+  headingDegHistory_.push_back(state.headingDeg);
+  uMpsHistory_.push_back(state.uMps);
+  vMpsHistory_.push_back(state.vMps);
+  wMpsHistory_.push_back(state.wMps);
   pDegPerSecHistory_.push_back(state.pDegPerSec);
   qDegPerSecHistory_.push_back(state.qDegPerSec);
   rDegPerSecHistory_.push_back(state.rDegPerSec);
+  calibratedAirspeedKtsHistory_.push_back(state.calibratedAirspeedKts);
+  trueAirspeedKtsHistory_.push_back(
+      state.trueAirspeedMps * MetersPerSecondToKnots);
+  altitudeAglFtHistory_.push_back(state.altitudeAglFt);
   uDotMps2History_.push_back(derivative.uDotMps2);
   vDotMps2History_.push_back(derivative.vDotMps2);
   wDotMps2History_.push_back(derivative.wDotMps2);

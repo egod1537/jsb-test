@@ -10,13 +10,13 @@ namespace UI = FlightUI;
 SamplePlotWindow::SamplePlotWindow() : Window("ImPlot Test") {}
 
 void SamplePlotWindow::OnRender(GUI &) {
-  constexpr int POINT_COUNT = 240;
+  constexpr int PointCount = 240;
 
-  std::array<double, POINT_COUNT> xs{};
-  std::array<double, POINT_COUNT> ys{};
+  std::array<double, PointCount> xs{};
+  std::array<double, PointCount> ys{};
 
   const double time = UI::GetTime();
-  for (int index = 0; index < POINT_COUNT; ++index) {
+  for (int index = 0; index < PointCount; ++index) {
     xs[index] = static_cast<double>(index) / 24.0;
     ys[index] = std::sin(xs[index] + time);
   }

@@ -1,10 +1,12 @@
 #include "application/sim/Aircraft.hpp"
 #include "application/sim/gnc/TrimTypes.hpp"
+#include "application/sim/linearizer/LinearizationResult.hpp"
 
 #include <FGFDMExec.h>
 #include <cmath>
 #include <filesystem>
 #include <initialization/FGInitialCondition.h>
+#include <initialization/FGLinearization.h>
 #include <initialization/FGTrim.h>
 #include <iostream>
 #include <simgear/misc/sg_path.hxx>
@@ -73,13 +75,14 @@ int ToJSBTrimMode(gnc::TrimMode mode) {
 
 namespace sim {
 Aircraft::Aircraft()
-    : fdm_(std::make_unique<JSBSim::FGFDMExec>()), controls_(*fdm_),
-      engines_(*fdm_), properties_(*fdm_) {}
+    : fdm_(std::make_unique<JSBSim::FGFDMExec>()), fdmStateAccess_(*fdm_),
+      controls_(*fdm_), engines_(*fdm_), properties_(*fdm_) {}
 
 Aircraft::~Aircraft() = default;
 
 bool Aircraft::Initialize(const SimulationConfig &config,
     const InitialCondition &initialCondition) {
+  config_ = config;
   controls_.SetInput({});
 
   ConfigurePaths();
@@ -96,6 +99,8 @@ bool Aircraft::Tick() {
   controls_.Apply();
   return fdm_->Run();
 }
+
+const SimulationConfig &Aircraft::GetConfig() const { return config_; }
 
 AircraftState Aircraft::GetAircraftState() const {
   AircraftState state{};
@@ -126,6 +131,77 @@ AircraftStateDerivative Aircraft::GetAircraftStateDerivative() const {
   derivative.qDotDegPerSec2 = properties_.Q().DotDegPerSec2();
   derivative.rDotDegPerSec2 = properties_.R().DotDegPerSec2();
   return derivative;
+}
+
+FDMState Aircraft::ExtractFDMState(FDMStateFlags flags) const {
+  return fdmStateAccess_.Extract(flags);
+}
+
+void Aircraft::ApplyFDMState(const FDMState &state) {
+  fdmStateAccess_.Apply(state);
+
+  if (HasFDMStateFlag(state.flags, FDMStateFlags::Controls)) {
+    controls_.SetInput({
+        .elevator = state.controls.elevatorCommand,
+        .aileron = state.controls.aileronCommand,
+        .rudder = state.controls.rudderCommand,
+        .throttle = state.controls.throttleCommands.empty()
+                        ? 0.0
+                        : state.controls.throttleCommands.front(),
+    });
+  }
+}
+
+void Aircraft::SetIntegrationSuspended(bool suspended) {
+  if (suspended)
+    fdm_->SuspendIntegration();
+  else
+    fdm_->ResumeIntegration();
+}
+
+bool Aircraft::IsIntegrationSuspended() const {
+  return fdm_->IntegrationSuspended();
+}
+
+gnc::LinearizationResult Aircraft::ComputeLinearization() {
+  JSBSim::FGLinearization linearization(fdm_.get());
+
+  const auto &jsbA = linearization.GetSystemMatrix();
+  const auto &jsbB = linearization.GetInputMatrix();
+
+  gnc::LinearizationResult result{};
+
+  result.A.resize(jsbA.size(), jsbA.empty() ? 0 : jsbA[0].size());
+  for (std::size_t i = 0; i < jsbA.size(); ++i) {
+    for (std::size_t j = 0; j < jsbA[i].size(); ++j) {
+      result.A(i, j) = jsbA[i][j];
+    }
+  }
+
+  result.B.resize(jsbB.size(), jsbB.empty() ? 0 : jsbB[0].size());
+  for (std::size_t i = 0; i < jsbB.size(); ++i) {
+    for (std::size_t j = 0; j < jsbB[i].size(); ++j) {
+      result.B(i, j) = jsbB[i][j];
+    }
+  }
+
+  const auto &jsbX0 = linearization.GetInitialState();
+  const auto &jsbU0 = linearization.GetInitialInput();
+
+  result.x0.resize(jsbX0.size());
+  for (std::size_t i = 0; i < jsbX0.size(); i++) {
+    result.x0(i) = jsbX0[i];
+  }
+
+  result.u0.resize(jsbU0.size());
+  for (std::size_t i = 0; i < jsbU0.size(); i++) {
+    result.u0(i) = jsbU0[i];
+  }
+
+  result.stateNames = linearization.GetStateNames();
+  result.inputNames = linearization.GetInputNames();
+
+  return result;
 }
 
 bool Aircraft::ApplyInitialCondition(const InitialCondition &initialCondition) {
@@ -177,6 +253,7 @@ InitialCondition Aircraft::GetCurrentCondition() const {
 
 bool Aircraft::Reset(const SimulationConfig &config,
     const InitialCondition &initialCondition) {
+  config_ = config;
   ConfigureSimulation(config);
   controls_.Reset();
 
@@ -192,7 +269,7 @@ bool Aircraft::Reset(const SimulationConfig &config,
 
 void Aircraft::ResetSimulationTime() { fdm_->Setsim_time(0.0); }
 
-bool Aircraft::ApplyTrimInitialCondition(const gnc::TrimRequest &request) {
+bool Aircraft::InitializeForTrim(const gnc::TrimRequest &request) {
   if (request.mode != gnc::TrimMode::Ground) {
     auto initialCondition = fdm_->GetIC();
     initialCondition->SetVcalibratedKtsIC(request.airspeedKts);
@@ -203,15 +280,13 @@ bool Aircraft::ApplyTrimInitialCondition(const gnc::TrimRequest &request) {
   return fdm_->RunIC();
 }
 
-void Aircraft::ExecuteTrim(gnc::TrimMode mode) {
+void Aircraft::RunTrim(gnc::TrimMode mode) {
   fdm_->DoTrim(ToJSBTrimMode(mode));
 }
 
 jsbsim::ControlSystem &Aircraft::GetControls() { return controls_; }
 
-const jsbsim::ControlSystem &Aircraft::GetControls() const {
-  return controls_;
-}
+const jsbsim::ControlSystem &Aircraft::GetControls() const { return controls_; }
 
 jsbsim::EngineSystem &Aircraft::GetEngines() { return engines_; }
 

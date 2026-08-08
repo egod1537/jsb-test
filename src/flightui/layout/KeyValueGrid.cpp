@@ -138,12 +138,12 @@ KeyValueGridBuilder::operator UIElement() const {
 
     const int columnsPerRow = std::max(1, state.ColumnsPerRow);
     const int tableColumnCount = columnsPerRow * 2;
-    constexpr ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchProp
+    constexpr ImGuiTableFlags Flags = ImGuiTableFlags_SizingStretchProp
                                       | ImGuiTableFlags_NoSavedSettings
                                       | ImGuiTableFlags_PadOuterX;
     Internal::DisabledScope disabledScope(!state.Enabled);
 
-    if (!ImGui::BeginTable(state.Id.c_str(), tableColumnCount, flags)) {
+    if (!ImGui::BeginTable(state.Id.c_str(), tableColumnCount, Flags)) {
       return;
     }
 

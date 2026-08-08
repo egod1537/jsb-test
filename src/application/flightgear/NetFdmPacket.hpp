@@ -6,14 +6,14 @@
 #include <cstdint>
 
 namespace flightgear {
-constexpr std::uint32_t NET_FDM_VERSION = 24;
+constexpr std::uint32_t NetFdmVersion = 24;
 
-constexpr std::size_t MAX_ENGINES = 4;
-constexpr std::size_t MAX_TANKS = 4;
-constexpr std::size_t MAX_WHEELS = 3;
+constexpr std::size_t MaxEngines = 4;
+constexpr std::size_t MaxTanks = 4;
+constexpr std::size_t MaxWheels = 3;
 
 struct NetFdmPacket {
-  std::uint32_t version = NET_FDM_VERSION;
+  std::uint32_t version = NetFdmVersion;
   std::uint32_t padding = 0;
 
   double longitude = 0.0;
@@ -51,25 +51,25 @@ struct NetFdmPacket {
 
   std::uint32_t numEngines = 0;
 
-  std::array<std::uint32_t, MAX_ENGINES> engineState{};
-  std::array<float, MAX_ENGINES> rpm{};
-  std::array<float, MAX_ENGINES> fuelFlow{};
-  std::array<float, MAX_ENGINES> fuelPressure{};
-  std::array<float, MAX_ENGINES> egt{};
-  std::array<float, MAX_ENGINES> cht{};
-  std::array<float, MAX_ENGINES> manifoldPressure{};
-  std::array<float, MAX_ENGINES> tit{};
-  std::array<float, MAX_ENGINES> oilTemperature{};
-  std::array<float, MAX_ENGINES> oilPressure{};
+  std::array<std::uint32_t, MaxEngines> engineState{};
+  std::array<float, MaxEngines> rpm{};
+  std::array<float, MaxEngines> fuelFlow{};
+  std::array<float, MaxEngines> fuelPressure{};
+  std::array<float, MaxEngines> egt{};
+  std::array<float, MaxEngines> cht{};
+  std::array<float, MaxEngines> manifoldPressure{};
+  std::array<float, MaxEngines> tit{};
+  std::array<float, MaxEngines> oilTemperature{};
+  std::array<float, MaxEngines> oilPressure{};
 
   std::uint32_t numTanks = 0;
-  std::array<float, MAX_TANKS> fuelQuantity{};
+  std::array<float, MaxTanks> fuelQuantity{};
 
   std::uint32_t numWheels = 0;
-  std::array<std::uint32_t, MAX_WHEELS> weightOnWheels{};
-  std::array<float, MAX_WHEELS> gearPosition{};
-  std::array<float, MAX_WHEELS> gearSteer{};
-  std::array<float, MAX_WHEELS> gearCompression{};
+  std::array<std::uint32_t, MaxWheels> weightOnWheels{};
+  std::array<float, MaxWheels> gearPosition{};
+  std::array<float, MaxWheels> gearSteer{};
+  std::array<float, MaxWheels> gearCompression{};
 
   std::uint32_t currentTime = 0;
   std::int32_t warp = 0;

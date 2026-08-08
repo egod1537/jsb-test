@@ -70,7 +70,7 @@ TrimResult ExecuteTrim(sim::Aircraft &aircraft, TrimMode mode,
 
   try {
     if (initialConditionRequest != nullptr) {
-      if (!aircraft.ApplyTrimInitialCondition(*initialConditionRequest)) {
+      if (!aircraft.InitializeForTrim(*initialConditionRequest)) {
         std::cout << "[Trim] RunIC failed simTime="
                   << properties.SimTime().Sec() << '\n';
         return {
@@ -85,7 +85,7 @@ TrimResult ExecuteTrim(sim::Aircraft &aircraft, TrimMode mode,
 
     PreparePropulsionForTrim(aircraft, mode);
 
-    aircraft.ExecuteTrim(mode);
+    aircraft.RunTrim(mode);
 
     std::cout << "[Trim] DoTrim simTime=" << properties.SimTime().Sec() << '\n';
 

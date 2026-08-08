@@ -15,7 +15,7 @@ bool FlightControlManager::OnTick(const sim::Tick &tick) {
 }
 
 std::optional<ControlInput> FlightControlManager::ProduceControlInput(
-    const sim::Aircraft &aircraft, const sim::Tick &tick) {
+    sim::Aircraft &aircraft, const sim::Tick &tick) {
   switch (mode_) {
   case FlightControlMode::None:
     return std::nullopt;

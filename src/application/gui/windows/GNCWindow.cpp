@@ -21,16 +21,16 @@ constexpr double DegToRad = 0.017453292519943295769;
 gnc::RollHoldSettings MakeRollHoldSettings(const AutopilotPanelState &state) {
   return {
       .targetRollRad = state.rollTargetDeg * DegToRad,
-      .proportionalGain = state.rollHoldKp,
-      .derivativeGain = state.rollHoldKd,
+      .dampingRatio = state.rollHoldDampingRatio,
+      .naturalFrequencyRadPerSec = state.rollHoldNaturalFrequencyRadPerSec,
   };
 }
 
 gnc::PitchHoldSettings MakePitchHoldSettings(const AutopilotPanelState &state) {
   return {
       .targetPitchRad = state.pitchTargetDeg * DegToRad,
-      .proportionalGain = state.pitchHoldKp,
-      .derivativeGain = state.pitchHoldKd,
+      .dampingRatio = state.pitchHoldDampingRatio,
+      .naturalFrequencyRadPerSec = state.pitchHoldNaturalFrequencyRadPerSec,
   };
 }
 
@@ -166,6 +166,17 @@ void GNCWindow::OnRender(gui::GUI &gui) {
                                      &autopilot,
                                      &aircraft] {
                         const auto &properties = aircraft.GetProperties();
+                        const bool autopilotMode =
+                            flightControlManager->GetMode()
+                            == control::FlightControlMode::Autopilot;
+                        const bool rollHoldEnabled =
+                            autopilot.IsRollHoldEnabled();
+                        const bool pitchHoldEnabled =
+                            autopilot.IsPitchHoldEnabled();
+                        const bool rollDynamicsReady =
+                            autopilot.GetRollDynamics().has_value();
+                        const bool pitchDynamicsReady =
+                            autopilot.GetPitchDynamics().has_value();
                         AutopilotPanel::Draw({
                             .state = autopilotPanelState_,
                             .currentRollDeg = properties.Roll().Deg(),
@@ -174,9 +185,11 @@ void GNCWindow::OnRender(gui::GUI &gui) {
                             .currentAileron =
                                 aircraft.GetControls().GetAileron(),
                             .rollHoldActive =
-                                flightControlManager->GetMode()
-                                    == control::FlightControlMode::Autopilot
-                                && autopilot.IsRollHoldEnabled(),
+                                autopilotMode && rollHoldEnabled
+                                && rollDynamicsReady,
+                            .rollHoldPreparing =
+                                autopilotMode && rollHoldEnabled
+                                && !rollDynamicsReady,
                             .captureCurrentRoll = [this, &properties] {
                               autopilotPanelState_.rollTargetDeg =
                                   properties.Roll().Deg();
@@ -187,9 +200,11 @@ void GNCWindow::OnRender(gui::GUI &gui) {
                             .currentElevator =
                                 aircraft.GetControls().GetElevator(),
                             .pitchHoldActive =
-                                flightControlManager->GetMode()
-                                    == control::FlightControlMode::Autopilot
-                                && autopilot.IsPitchHoldEnabled(),
+                                autopilotMode && pitchHoldEnabled
+                                && pitchDynamicsReady,
+                            .pitchHoldPreparing =
+                                autopilotMode && pitchHoldEnabled
+                                && !pitchDynamicsReady,
                             .captureCurrentPitch = [this, &properties] {
                               autopilotPanelState_.pitchTargetDeg =
                                   properties.Pitch().Deg();

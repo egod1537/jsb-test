@@ -1,28 +1,37 @@
 #pragma once
 
+#include "application/sim/Aircraft.hpp"
+#include "application/sim/Tick.hpp"
 #include "application/sim/control/IFlightControlSource.hpp"
 #include "application/sim/gnc/Controller.hpp"
 #include "application/sim/gnc/hold/AirspeedHoldController.hpp"
-#include "application/sim/gnc/hold/AltitudeHoldController.hpp"
-#include "application/sim/gnc/hold/CourseHoldController.hpp"
 #include "application/sim/gnc/hold/PitchHoldController.hpp"
+#include "application/sim/gnc/hold/PitchDynamics.hpp"
+#include "application/sim/gnc/hold/RollDynamics.hpp"
 #include "application/sim/gnc/hold/RollHoldController.hpp"
 #include "application/sim/gnc/TrimTypes.hpp"
+#include "application/sim/linearizer/LinearizationResult.hpp"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
+namespace sim {
+class AsyncAircraftLinearizer;
+}
+
 namespace gnc {
 class Autopilot final : public control::IFlightControlSource {
 public:
   explicit Autopilot(control::IFlightControlSource &passthroughSource);
+  ~Autopilot() override;
 
   // Lifecycle and control output
   void OnReset();
-  control::ControlInput OnTick(const sim::Aircraft &aircraft,
+  control::ControlInput OnTick(sim::Aircraft &aircraft,
       const sim::Tick &tick) override;
 
   // Controller registry
@@ -53,11 +62,19 @@ public:
   void SetPitchHoldSettings(const PitchHoldSettings &settings);
   const PitchHoldSettings &GetPitchHoldSettings() const;
 
+  // Linearization
+  std::optional<RollDynamics> GetRollDynamics() const;
+  std::optional<PitchDynamics> GetPitchDynamics() const;
+
 private:
   // Trim management
   bool StoreSolvedTrimResult(const TrimResult &result);
   void ResetControllers();
   void SyncControllerTrimReferences(const TrimResult &result);
+
+  // Aircraft dynamics
+  void UpdateLinearization(sim::Aircraft &aircraft, const sim::Tick &tick);
+  void InvalidateLinearization();
 
   // Input dependency
   control::IFlightControlSource &passthroughSource_;
@@ -67,7 +84,13 @@ private:
 
   // Controller ownership
   std::vector<std::unique_ptr<Controller>> controllers_;
-};
-} // namespace gnc
 
+  // Aircraft dynamics
+  std::unique_ptr<sim::AsyncAircraftLinearizer> asyncLinearizer_;
+  std::optional<LinearizationResult> linearization_;
+  std::optional<double> lastLinearizationRequestSimTimeSec_;
+  std::uint64_t linearizationGeneration_ = 0;
+};
+
+} // namespace gnc
 #include "application/sim/gnc/Autopilot.inl"

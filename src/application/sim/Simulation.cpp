@@ -1,6 +1,8 @@
 #include "application/sim/Simulation.hpp"
 #include "application/sim/SimulationConfig.h"
 #include "application/sim/StateLogger.hpp"
+#include "application/sim/linearizer/LinearizationResult.hpp"
+
 #include <cmath>
 #include <iostream>
 

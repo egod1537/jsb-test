@@ -28,8 +28,8 @@ void SimulationWindow::OnRender(gui::GUI &gui) {
   UI::TabGroup(
       "SimulationTabs")[+UI::Tab("Initial Condition")[UI::Custom([this, &gui] {
     DrawInitialConditionTab(gui);
-  })] + UI::Tab("Runtime")[UI::Custom([this, &gui] {
-    DrawRuntimeTab(gui);
+  })] + UI::Tab("Diagnostics")[UI::Custom([this, &gui] {
+    DrawDiagnosticsTab(gui);
   })] + UI::Tab("Environment")[UI::Custom([this] {
     DrawEnvironmentTab();
   })] + UI::Tab("Aircraft")[UI::Custom([this, &gui] { DrawAircraftTab(gui); })]]
@@ -44,29 +44,25 @@ void SimulationWindow::DrawInitialConditionTab(gui::GUI &gui) {
       .Render();
 }
 
-void SimulationWindow::DrawRuntimeTab(gui::GUI &gui) {
+void SimulationWindow::DrawDiagnosticsTab(gui::GUI &gui) {
   auto &simulation = gui.GetSimulation();
   const auto &executionControl = gui.GetSimulationExecutionControl();
   const sim::AircraftState aircraftState =
       simulation.GetAircraft().GetAircraftState();
 
   UI::VerticalLayout()
-      .Spacing(
-          LayoutSpacing)[+UI::Heading("Runtime")
-                         + UI::ValueLabel("Simulation Time",
-                             aircraftState.simulationTimeSec,
-                             "%.2f s")
-                         + UI::Text(std::string("State: ")
-                                    + application::ToString(executionControl
-                                            .GetSimulationExecutionState()))
-                         + UI::ValueLabel("Tick Size",
-                             simulation.GetTickSizeSec(),
-                             "%.6f s")
-                         + UI::ValueLabel("Pending Ticks",
-                             static_cast<int>(executionControl
-                                     .GetPendingSimulationTickCount()),
-                             "%d")
-                         + BuildRuntimeActions(gui) + DrawLastError(gui)]
+      .Spacing(LayoutSpacing)[+UI::Heading("Diagnostics")
+                              + UI::ValueLabel("Simulation Time",
+                                  aircraftState.simulationTimeSec,
+                                  "%.2f s")
+                              + UI::ValueLabel("Tick Size",
+                                  simulation.GetTickSizeSec(),
+                                  "%.6f s")
+                              + UI::ValueLabel("Pending Ticks",
+                                  static_cast<int>(executionControl
+                                          .GetPendingSimulationTickCount()),
+                                  "%d")
+                              + DrawLastError(gui)]
       .Render();
 }
 
@@ -171,43 +167,6 @@ UI::UIElement SimulationWindow::DrawInitialConditionActions(gui::GUI &gui) {
               initialCondition_ = simulation.GetDefaultInitialCondition();
               simulation.GetErrorTracker().ClearError();
             })];
-}
-
-UI::UIElement SimulationWindow::BuildRuntimeActions(gui::GUI &gui) {
-  auto &simulation = gui.GetSimulation();
-  auto &executionControl = gui.GetSimulationExecutionControl();
-  const application::SimulationExecutionState executionState =
-      executionControl.GetSimulationExecutionState();
-
-  return UI::HorizontalLayout().Spacing(LayoutSpacing)
-      [+UI::Button("Pause")
-              .Enabled(executionState
-                       == application::SimulationExecutionState::Running)
-              .OnAction(
-                  [&executionControl] { executionControl.PauseSimulation(); })
-          + UI::Button("Resume")
-              .Enabled(executionState
-                       == application::SimulationExecutionState::Paused)
-              .OnAction(
-                  [&executionControl] { executionControl.ResumeSimulation(); })
-          + UI::Button("Tick Once")
-              .Enabled(executionState
-                       == application::SimulationExecutionState::Paused)
-              .OnAction([&executionControl] {
-                executionControl.RequestSimulationTick();
-              })
-          + UI::Button("Reset")
-              .Enabled(executionState
-                       != application::SimulationExecutionState::Stopped)
-              .OnAction([&simulation, &executionControl, executionState] {
-                const bool resumeAfterReset =
-                    executionState
-                    == application::SimulationExecutionState::Running;
-                executionControl.PauseSimulation();
-                if (executionControl.ResetSimulation() && resumeAfterReset) {
-                  executionControl.ResumeSimulation();
-                }
-              })];
 }
 
 UI::UIElement SimulationWindow::DrawLastError(gui::GUI &gui) const {

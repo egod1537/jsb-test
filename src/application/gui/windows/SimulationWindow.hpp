@@ -18,7 +18,7 @@ protected:
 private:
   // Tab rendering
   void DrawInitialConditionTab(gui::GUI &gui);
-  void DrawRuntimeTab(gui::GUI &gui);
+  void DrawDiagnosticsTab(gui::GUI &gui);
   void DrawEnvironmentTab();
   void DrawAircraftTab(gui::GUI &gui);
 
@@ -26,8 +26,7 @@ private:
   FlightUI::UIElement DrawInitialConditionFields();
   FlightUI::UIElement DrawInitialConditionActions(gui::GUI &gui);
 
-  // Runtime controls and diagnostics
-  FlightUI::UIElement BuildRuntimeActions(gui::GUI &gui);
+  // Simulation diagnostics
   FlightUI::UIElement DrawLastError(gui::GUI &gui) const;
 
   // Editable initial-condition form

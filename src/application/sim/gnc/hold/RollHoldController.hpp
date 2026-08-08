@@ -10,10 +10,12 @@ struct Tick;
 } // namespace sim
 
 namespace gnc {
+struct ControlContext;
+
 struct RollHoldSettings {
-  double targetRollRad = 0.0;
-  double proportionalGain = 0.5;
-  double derivativeGain = 2.0;
+  double targetRollRad{};
+  double dampingRatio{};
+  double naturalFrequencyRadPerSec{};
 };
 
 class RollHoldController final : public Controller {
@@ -30,7 +32,7 @@ public:
   void SetTrimAileron(double trimAileron);
 
   std::optional<double> OnTick(const sim::Aircraft &aircraft,
-      const sim::Tick &tick);
+      const sim::Tick &tick, const ControlContext &context);
 
 private:
   bool enabled_ = false;

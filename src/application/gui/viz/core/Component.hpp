@@ -17,8 +17,8 @@ public:
   const Transform &GetTransform() const;
 
   // Frame lifecycle
-  virtual void OnTick(const TickContext &) {}
-  virtual void Render(RenderContext &) const {}
+  virtual void OnTick(const TickContext &context) {}
+  virtual void Render(RenderContext &context) const {}
 
 private:
   friend class GameObject;

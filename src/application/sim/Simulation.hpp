@@ -10,9 +10,7 @@
 
 #include <cstdint>
 #include <memory>
-#include <type_traits>
 #include <typeinfo>
-#include <utility>
 #include <vector>
 
 namespace sim {
@@ -22,10 +20,10 @@ public:
   Simulation();
   ~Simulation();
 
-  Simulation(const Simulation &) = delete;
-  Simulation &operator=(const Simulation &) = delete;
+  Simulation(const Simulation &other) = delete;
+  Simulation &operator=(const Simulation &other) = delete;
 
-  bool Initialize(const SimulationConfig &);
+  bool Initialize(const SimulationConfig &config);
   bool Tick();
   void Shutdown();
 

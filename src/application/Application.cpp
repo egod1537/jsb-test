@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <memory>
 #include <thread>
@@ -17,12 +18,28 @@ Clock::duration ToClockDuration(double seconds) {
   return std::chrono::duration_cast<Clock::duration>(
       std::chrono::duration<double>(seconds));
 }
+
+double ClampAutomaticSimulationHz(double hz) {
+  if (!std::isfinite(hz)) {
+    return application::MinimumAutomaticSimulationHz;
+  }
+
+  return std::clamp(hz,
+      application::MinimumAutomaticSimulationHz,
+      application::MaximumAutomaticSimulationHz);
+}
+
+Clock::duration ToSimulationInterval(double hz) {
+  return ToClockDuration(1.0 / ClampAutomaticSimulationHz(hz));
+}
 } // namespace
 
 Application::Application(std::unique_ptr<gui::GUI> gui,
     std::unique_ptr<sim::Simulation> sim, sim::SimulationConfig simConfig)
     : sim_(std::move(sim)), gui_(std::move(gui)),
-      simConfig_(std::move(simConfig)) {}
+      simConfig_(std::move(simConfig)),
+      automaticSimulationHz_(
+          ClampAutomaticSimulationHz(simConfig_.simulationHz)) {}
 
 Application::~Application() = default;
 
@@ -33,8 +50,9 @@ bool Application::Run(const volatile std::sig_atomic_t &running) {
   }
 
   bool succeeded = true;
-  const Clock::duration simulationInterval =
-      ToClockDuration(sim_->GetConfig().GetDT());
+  double scheduledSimulationHz = automaticSimulationHz_;
+  Clock::duration simulationInterval =
+      ToSimulationInterval(scheduledSimulationHz);
   const double guiDt = gui_->GetConfig().GetRenderDT();
   const Clock::duration guiInterval =
       guiDt > 0.0 ? ToClockDuration(guiDt) : simulationInterval;
@@ -45,14 +63,31 @@ bool Application::Run(const volatile std::sig_atomic_t &running) {
   while (succeeded && running && !gui_->ShouldClose()) {
     auto now = Clock::now();
 
-    while (now >= nextSimulationTick) {
+    if (automaticSimulationHz_ != scheduledSimulationHz) {
+      scheduledSimulationHz = automaticSimulationHz_;
+      simulationInterval = ToSimulationInterval(scheduledSimulationHz);
+      nextSimulationTick = now + simulationInterval;
+    }
+
+    const bool hasPendingManualTick =
+        simulationExecutionState_
+            == application::SimulationExecutionState::Paused
+        && pendingSimulationTicks_ > 0;
+
+    if (hasPendingManualTick) {
       if (!TickSimulation()) {
         succeeded = false;
-        break;
       }
+    } else {
+      while (now >= nextSimulationTick) {
+        if (!TickSimulation()) {
+          succeeded = false;
+          break;
+        }
 
-      nextSimulationTick += simulationInterval;
-      now = Clock::now();
+        nextSimulationTick += simulationInterval;
+        now = Clock::now();
+      }
     }
 
     if (!succeeded) {
@@ -153,6 +188,14 @@ void Application::RequestSimulationTick() {
       == application::SimulationExecutionState::Paused) {
     ++pendingSimulationTicks_;
   }
+}
+
+void Application::SetAutomaticSimulationHz(double hz) {
+  if (!std::isfinite(hz)) {
+    return;
+  }
+
+  automaticSimulationHz_ = ClampAutomaticSimulationHz(hz);
 }
 
 bool Application::ResetSimulation() {

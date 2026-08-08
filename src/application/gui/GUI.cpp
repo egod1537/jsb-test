@@ -12,12 +12,12 @@
 #include <utility>
 
 namespace {
-constexpr const char *GLSL_VERSION = "#version 130";
-constexpr int SWAP_INTERVAL = 1;
-constexpr float CLEAR_COLOR_R = 0.10F;
-constexpr float CLEAR_COLOR_G = 0.11F;
-constexpr float CLEAR_COLOR_B = 0.13F;
-constexpr float CLEAR_COLOR_A = 1.00F;
+constexpr const char *GlslVersion = "#version 130";
+constexpr int SwapInterval = 1;
+constexpr float ClearColorR = 0.10F;
+constexpr float ClearColorG = 0.11F;
+constexpr float ClearColorB = 0.13F;
+constexpr float ClearColorA = 1.00F;
 } // namespace
 
 namespace gui {
@@ -60,7 +60,7 @@ bool GUI::Start() {
   }
 
   glfwMakeContextCurrent(window_);
-  glfwSwapInterval(SWAP_INTERVAL);
+  glfwSwapInterval(SwapInterval);
 
   IMGUI_CHECKVERSION();
 
@@ -82,7 +82,7 @@ bool GUI::Start() {
   }
   glfwBackendInitialized_ = true;
 
-  if (!ImGui_ImplOpenGL3_Init(GLSL_VERSION)) {
+  if (!ImGui_ImplOpenGL3_Init(GlslVersion)) {
     std::cerr << "Failed to initialize ImGui OpenGL backend\n";
     Exit();
     return false;
@@ -197,10 +197,10 @@ void GUI::EndFrame() {
   glfwGetFramebufferSize(window_, &displayWidth, &displayHeight);
 
   glViewport(0, 0, displayWidth, displayHeight);
-  glClearColor(CLEAR_COLOR_R * CLEAR_COLOR_A,
-      CLEAR_COLOR_G * CLEAR_COLOR_A,
-      CLEAR_COLOR_B * CLEAR_COLOR_A,
-      CLEAR_COLOR_A);
+  glClearColor(ClearColorR * ClearColorA,
+      ClearColorG * ClearColorA,
+      ClearColorB * ClearColorA,
+      ClearColorA);
   glClear(GL_COLOR_BUFFER_BIT);
 
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -9,5 +9,8 @@ public:
 
 protected:
   void OnRender(gui::GUI &gui) override;
+
+private:
+  void DrawRuntimePanel(gui::GUI &gui);
 };
 } // namespace gui

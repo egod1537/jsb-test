@@ -36,8 +36,8 @@ protected:
 
 private:
   // Control routing
-  std::optional<ControlInput> ProduceControlInput(
-      const sim::Aircraft &aircraft, const sim::Tick &tick);
+  std::optional<ControlInput> ProduceControlInput(sim::Aircraft &aircraft,
+      const sim::Tick &tick);
 
   // Control sources
   ManualFlightControlController manualController_;

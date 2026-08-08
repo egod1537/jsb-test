@@ -6,8 +6,7 @@ namespace control {
 class ManualFlightControlController final : public IFlightControlSource {
 public:
   void OnReset();
-  ControlInput OnTick(const sim::Aircraft &aircraft,
-      const sim::Tick &tick) override;
+  ControlInput OnTick(sim::Aircraft &aircraft, const sim::Tick &tick) override;
 
   const ControlInput &GetCommandedInput() const;
   bool SetCommandedInput(const ControlInput &input);

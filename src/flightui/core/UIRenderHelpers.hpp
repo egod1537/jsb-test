@@ -6,8 +6,8 @@ namespace FlightUI::Internal {
 class IdScope {
 public:
   explicit IdScope(const std::string &id);
-  IdScope(const IdScope &) = delete;
-  IdScope &operator=(const IdScope &) = delete;
+  IdScope(const IdScope &other) = delete;
+  IdScope &operator=(const IdScope &other) = delete;
   ~IdScope();
 
 private:
@@ -17,8 +17,8 @@ private:
 class DisabledScope {
 public:
   explicit DisabledScope(bool disabled);
-  DisabledScope(const DisabledScope &) = delete;
-  DisabledScope &operator=(const DisabledScope &) = delete;
+  DisabledScope(const DisabledScope &other) = delete;
+  DisabledScope &operator=(const DisabledScope &other) = delete;
   ~DisabledScope();
 
 private:
@@ -28,8 +28,8 @@ private:
 class ItemWidthScope {
 public:
   explicit ItemWidthScope(float width);
-  ItemWidthScope(const ItemWidthScope &) = delete;
-  ItemWidthScope &operator=(const ItemWidthScope &) = delete;
+  ItemWidthScope(const ItemWidthScope &other) = delete;
+  ItemWidthScope &operator=(const ItemWidthScope &other) = delete;
   ~ItemWidthScope();
 
 private:

@@ -12,7 +12,7 @@ class IFlightControlSource {
 public:
   virtual ~IFlightControlSource() = default;
 
-  virtual ControlInput OnTick(const sim::Aircraft &aircraft,
+  virtual ControlInput OnTick(sim::Aircraft &aircraft,
       const sim::Tick &tick) = 0;
 };
 } // namespace control

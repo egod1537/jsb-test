@@ -7,6 +7,9 @@ struct InitialCondition;
 }
 
 namespace application {
+inline constexpr double MinimumAutomaticSimulationHz = 1.0;
+inline constexpr double MaximumAutomaticSimulationHz = 1000.0;
+
 enum class SimulationExecutionState {
   Running,
   Paused,
@@ -34,6 +37,8 @@ public:
   virtual void PauseSimulation() = 0;
   virtual void ResumeSimulation() = 0;
   virtual void RequestSimulationTick() = 0;
+  virtual double GetAutomaticSimulationHz() const = 0;
+  virtual void SetAutomaticSimulationHz(double hz) = 0;
   virtual bool ResetSimulation() = 0;
   virtual bool ResetSimulation(
       const sim::InitialCondition &initialCondition) = 0;

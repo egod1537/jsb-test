@@ -10,10 +10,12 @@ struct Tick;
 } // namespace sim
 
 namespace gnc {
+struct ControlContext;
+
 struct PitchHoldSettings {
-  double targetPitchRad = 0.0;
-  double proportionalGain = 0.5;
-  double derivativeGain = 2.0;
+  double targetPitchRad{};
+  double dampingRatio{};
+  double naturalFrequencyRadPerSec{};
 };
 
 class PitchHoldController final : public Controller {
@@ -30,7 +32,7 @@ public:
   void SetTrimElevator(double trimElevator);
 
   std::optional<double> OnTick(const sim::Aircraft &aircraft,
-      const sim::Tick &tick);
+      const sim::Tick &tick, const ControlContext &context);
 
 private:
   bool enabled_ = false;

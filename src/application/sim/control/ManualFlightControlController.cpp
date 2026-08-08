@@ -11,7 +11,7 @@ constexpr double InputStep = 0.05;
 
 void ManualFlightControlController::OnReset() { commandedInput_ = {}; }
 
-ControlInput ManualFlightControlController::OnTick(const sim::Aircraft &,
+ControlInput ManualFlightControlController::OnTick(sim::Aircraft &,
     const sim::Tick &) {
   bool changed = false;
 

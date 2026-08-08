@@ -249,27 +249,27 @@ PlotBuilder &PlotBuilder::SetFlags(ImPlotFlags flags) {
 }
 
 PlotBuilder &PlotBuilder::SetFixedView(bool enabled) {
-  constexpr ImPlotFlags fixedViewFlags =
+  constexpr ImPlotFlags FixedViewFlags =
       ImPlotFlags_NoInputs | ImPlotFlags_NoMenus | ImPlotFlags_NoBoxSelect
       | ImPlotFlags_NoTitle;
 
   if (enabled) {
-    m_Impl->Flags |= fixedViewFlags;
+    m_Impl->Flags |= FixedViewFlags;
   } else {
-    m_Impl->Flags &= ~fixedViewFlags;
+    m_Impl->Flags &= ~FixedViewFlags;
   }
 
   return *this;
 }
 
 PlotBuilder &PlotBuilder::SetFocusedYAxis(bool enabled) {
-  constexpr ImPlotAxisFlags focusedYAxisFlags =
+  constexpr ImPlotAxisFlags FocusedYAxisFlags =
       ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_RangeFit;
 
   if (enabled) {
-    m_Impl->YAxisFlags |= focusedYAxisFlags;
+    m_Impl->YAxisFlags |= FocusedYAxisFlags;
   } else {
-    m_Impl->YAxisFlags &= ~focusedYAxisFlags;
+    m_Impl->YAxisFlags &= ~FocusedYAxisFlags;
   }
 
   return *this;

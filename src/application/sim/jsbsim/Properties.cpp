@@ -5,9 +5,14 @@
 namespace {
 constexpr const char *SimTimeSec = "simulation/sim-time-sec";
 constexpr const char *AltitudeAglFt = "position/h-agl-ft";
+constexpr const char *LatitudeRad = "position/lat-gc-rad";
+constexpr const char *LongitudeRad = "position/long-gc-rad";
+constexpr const char *RadiusToVehicleFt = "position/radius-to-vehicle-ft";
 constexpr const char *CalibratedAirspeedKts = "velocities/vc-kts";
 constexpr const char *TrueAirspeedKts = "velocities/vtrue-kts";
 constexpr const char *TrueAirspeedFps = "velocities/vtrue-fps";
+constexpr const char *NorthVelocityFps = "velocities/v-north-fps";
+constexpr const char *EastVelocityFps = "velocities/v-east-fps";
 constexpr const char *UFps = "velocities/u-fps";
 constexpr const char *VFps = "velocities/v-fps";
 constexpr const char *WFps = "velocities/w-fps";
@@ -45,8 +50,7 @@ TimeView::TimeView(const Properties &properties, const char *secPath)
 
 double TimeView::Sec() const { return properties_.Get(secPath_); }
 
-MutableTimeView::MutableTimeView(Properties &properties,
-    const char *secPath)
+MutableTimeView::MutableTimeView(Properties &properties, const char *secPath)
     : properties_(properties), secPath_(secPath) {}
 
 double MutableTimeView::Sec() const { return properties_.Get(secPath_); }
@@ -55,8 +59,7 @@ void MutableTimeView::SetSec(double value) const {
   properties_.Set(secPath_, value);
 }
 
-DistanceView::DistanceView(const Properties &properties,
-    const char *ftPath)
+DistanceView::DistanceView(const Properties &properties, const char *ftPath)
     : properties_(properties), ftPath_(ftPath) {}
 
 double DistanceView::Ft() const { return properties_.Get(ftPath_); }
@@ -91,8 +94,8 @@ double AngleView::Deg() const {
   return RadToDegValue(Rad());
 }
 
-MutableAngleView::MutableAngleView(Properties &properties,
-    const char *radPath, const char *degPath)
+MutableAngleView::MutableAngleView(Properties &properties, const char *radPath,
+    const char *degPath)
     : properties_(properties), radPath_(radPath), degPath_(degPath) {}
 
 double MutableAngleView::Rad() const {
@@ -142,9 +145,7 @@ double AngularRateView::RadPerSec() const {
   return properties_.Get(rateRadPerSecPath_);
 }
 
-double AngularRateView::DegPerSec() const {
-  return RadToDegValue(RadPerSec());
-}
+double AngularRateView::DegPerSec() const { return RadToDegValue(RadPerSec()); }
 
 double AngularRateView::DotRadPerSec2() const {
   return properties_.Get(dotRadPerSec2Path_);
@@ -159,12 +160,20 @@ LinearVelocityView::LinearVelocityView(const Properties &properties,
     : properties_(properties), velocityFpsPath_(velocityFpsPath),
       dotFps2Path_(dotFps2Path) {}
 
+double LinearVelocityView::Fps() const {
+  return properties_.Get(velocityFpsPath_);
+}
+
 double LinearVelocityView::Mps() const {
-  return FeetPerSecToMetersPerSec(properties_.Get(velocityFpsPath_));
+  return FeetPerSecToMetersPerSec(Fps());
+}
+
+double LinearVelocityView::DotFps2() const {
+  return properties_.Get(dotFps2Path_);
 }
 
 double LinearVelocityView::DotMps2() const {
-  return FeetPerSec2ToMetersPerSec2(properties_.Get(dotFps2Path_));
+  return FeetPerSec2ToMetersPerSec2(DotFps2());
 }
 
 SpeedView::SpeedView(const Properties &properties, const char *fpsPath,
@@ -191,13 +200,11 @@ double SpeedView::Fps() const {
 
 double SpeedView::FtPerMin() const { return Fps() * 60.0; }
 
-MutableSpeedView::MutableSpeedView(Properties &properties,
-    const char *fpsPath, const char *ktsPath)
+MutableSpeedView::MutableSpeedView(Properties &properties, const char *fpsPath,
+    const char *ktsPath)
     : properties_(properties), fpsPath_(fpsPath), ktsPath_(ktsPath) {}
 
-double MutableSpeedView::Mps() const {
-  return FeetPerSecToMetersPerSec(Fps());
-}
+double MutableSpeedView::Mps() const { return FeetPerSecToMetersPerSec(Fps()); }
 
 double MutableSpeedView::Kts() const {
   if (ktsPath_ != nullptr) {
@@ -228,8 +235,7 @@ void MutableSpeedView::SetKts(double value) const {
   }
 }
 
-Properties::Properties(JSBSim::FGFDMExec &fdmExec)
-    : fdmExec_(fdmExec) {}
+Properties::Properties(JSBSim::FGFDMExec &fdmExec) : fdmExec_(fdmExec) {}
 
 double Properties::Get(const std::string &name) const {
   return fdmExec_.GetPropertyValue(name);
@@ -243,9 +249,7 @@ MutableTimeView Properties::SimTime() {
   return MutableTimeView(*this, SimTimeSec);
 }
 
-TimeView Properties::SimTime() const {
-  return TimeView(*this, SimTimeSec);
-}
+TimeView Properties::SimTime() const { return TimeView(*this, SimTimeSec); }
 
 MutableDistanceView Properties::AltitudeAgl() {
   return MutableDistanceView(*this, AltitudeAglFt);
@@ -253,6 +257,18 @@ MutableDistanceView Properties::AltitudeAgl() {
 
 DistanceView Properties::AltitudeAgl() const {
   return DistanceView(*this, AltitudeAglFt);
+}
+
+AngleView Properties::Latitude() const {
+  return AngleView(*this, LatitudeRad, nullptr);
+}
+
+AngleView Properties::Longitude() const {
+  return AngleView(*this, LongitudeRad, nullptr);
+}
+
+DistanceView Properties::RadiusToVehicle() const {
+  return DistanceView(*this, RadiusToVehicleFt);
 }
 
 MutableSpeedView Properties::CalibratedAirspeed() {
@@ -269,6 +285,14 @@ SpeedView Properties::TrueAirspeed() const {
 
 SpeedView Properties::VerticalSpeed() const {
   return SpeedView(*this, VerticalSpeedFps, nullptr);
+}
+
+SpeedView Properties::NorthVelocity() const {
+  return SpeedView(*this, NorthVelocityFps, nullptr);
+}
+
+SpeedView Properties::EastVelocity() const {
+  return SpeedView(*this, EastVelocityFps, nullptr);
 }
 
 LinearVelocityView Properties::U() const {

@@ -87,8 +87,8 @@ private:
 
 class AngularRateView {
 public:
-  AngularRateView(const Properties &properties,
-      const char *rateRadPerSecPath, const char *dotRadPerSec2Path);
+  AngularRateView(const Properties &properties, const char *rateRadPerSecPath,
+      const char *dotRadPerSec2Path);
 
   double RadPerSec() const;
   double DegPerSec() const;
@@ -103,10 +103,12 @@ private:
 
 class LinearVelocityView {
 public:
-  LinearVelocityView(const Properties &properties,
-      const char *velocityFpsPath, const char *dotFps2Path);
+  LinearVelocityView(const Properties &properties, const char *velocityFpsPath,
+      const char *dotFps2Path);
 
+  double Fps() const;
   double Mps() const;
+  double DotFps2() const;
   double DotMps2() const;
 
 private:
@@ -161,12 +163,19 @@ public:
   TimeView SimTime() const;
   MutableDistanceView AltitudeAgl();
   DistanceView AltitudeAgl() const;
+  AngleView Latitude() const;
+  AngleView Longitude() const;
+  DistanceView RadiusToVehicle() const;
 
   // Air data
   MutableSpeedView CalibratedAirspeed();
   SpeedView CalibratedAirspeed() const;
   SpeedView TrueAirspeed() const;
   SpeedView VerticalSpeed() const;
+
+  // Local navigation velocity
+  SpeedView NorthVelocity() const;
+  SpeedView EastVelocity() const;
 
   // Body velocity
   LinearVelocityView U() const;

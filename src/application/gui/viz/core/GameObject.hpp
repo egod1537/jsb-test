@@ -16,8 +16,8 @@ public:
   explicit GameObject(std::string name);
   ~GameObject();
 
-  GameObject(const GameObject &) = delete;
-  GameObject &operator=(const GameObject &) = delete;
+  GameObject(const GameObject &other) = delete;
+  GameObject &operator=(const GameObject &other) = delete;
 
   // Identity and transform
   const std::string &GetName() const { return name_; }

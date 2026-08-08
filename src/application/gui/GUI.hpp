@@ -22,8 +22,8 @@ public:
   explicit GUI(sim::Simulation *sim, GUIConfig config = {});
   ~GUI();
 
-  GUI(const GUI &) = delete;
-  GUI &operator=(const GUI &) = delete;
+  GUI(const GUI &other) = delete;
+  GUI &operator=(const GUI &other) = delete;
 
   bool Start();
   void Tick();

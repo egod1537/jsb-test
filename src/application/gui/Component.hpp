@@ -8,8 +8,8 @@ public:
   // Lifetime
   virtual ~Component() = default;
 
-  Component(const Component &) = delete;
-  Component &operator=(const Component &) = delete;
+  Component(const Component &other) = delete;
+  Component &operator=(const Component &other) = delete;
 
   // Enabled state
   bool IsEnabled() const { return enabled_; }
@@ -38,8 +38,8 @@ protected:
   Component() = default;
 
   // Extension hooks
-  virtual void OnStart(GUI &) {}
-  virtual void OnTick(GUI &) = 0;
+  virtual void OnStart(GUI &gui) {}
+  virtual void OnTick(GUI &gui) = 0;
 
 private:
   // Lifecycle state
