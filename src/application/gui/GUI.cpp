@@ -1,23 +1,50 @@
 #include "GUI.hpp"
 #include "application/gui/viz/FlightVisualizer.hpp"
 #include "application/gui/windows/GNCWindow.hpp"
+#include "application/gui/windows/LinearizationWindow.hpp"
 #include "application/gui/windows/SimulationWindow.hpp"
 #include "application/gui/windows/monitor/FlightDataMonitorWindow.hpp"
 #include "application/gui/windows/viz/FlightVizWindow.hpp"
+#include "flightui/core/Theme.hpp"
+#include "flightui/core/UIFont.hpp"
+#include "flightui/core/UIScale.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "implot.h"
+#include <cmath>
 #include <iostream>
 #include <utility>
 
 namespace {
 constexpr const char *GlslVersion = "#version 130";
 constexpr int SwapInterval = 1;
-constexpr float ClearColorR = 0.10F;
-constexpr float ClearColorG = 0.11F;
-constexpr float ClearColorB = 0.13F;
-constexpr float ClearColorA = 1.00F;
+constexpr float UIScaleChangeThreshold = 0.02F;
+
+ImVec2 Scaled(ImVec2 value, float scale) {
+  return {value.x * scale, value.y * scale};
+}
+
+void ScaleImPlotStyle(ImPlotStyle &style, float scale) {
+  style.PlotDefaultSize = Scaled(style.PlotDefaultSize, scale);
+  style.PlotMinSize = Scaled(style.PlotMinSize, scale);
+  style.PlotBorderSize *= scale;
+  style.MajorTickLen = Scaled(style.MajorTickLen, scale);
+  style.MinorTickLen = Scaled(style.MinorTickLen, scale);
+  style.MajorTickSize = Scaled(style.MajorTickSize, scale);
+  style.MinorTickSize = Scaled(style.MinorTickSize, scale);
+  style.MajorGridSize = Scaled(style.MajorGridSize, scale);
+  style.MinorGridSize = Scaled(style.MinorGridSize, scale);
+  style.PlotPadding = Scaled(style.PlotPadding, scale);
+  style.LabelPadding = Scaled(style.LabelPadding, scale);
+  style.LegendPadding = Scaled(style.LegendPadding, scale);
+  style.LegendInnerPadding = Scaled(style.LegendInnerPadding, scale);
+  style.LegendSpacing = Scaled(style.LegendSpacing, scale);
+  style.MousePosPadding = Scaled(style.MousePosPadding, scale);
+  style.AnnotationPadding = Scaled(style.AnnotationPadding, scale);
+  style.DigitalPadding *= scale;
+  style.DigitalSpacing *= scale;
+}
 } // namespace
 
 namespace gui {
@@ -27,6 +54,7 @@ GUI::GUI(sim::Simulation *sim, GUIConfig config)
       config_(std::move(config)) {
   RegisterWindow<SimulationWindow>();
   RegisterWindow<GNCWindow>();
+  RegisterWindow<LinearizationWindow>();
   RegisterWindow<FlightDataMonitorWindow>();
   RegisterWindow<FlightVizWindow>();
 }
@@ -72,8 +100,15 @@ bool GUI::Start() {
 
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  // DPI changes affect raster density through the GLFW/OpenGL backends. Keep
+  // logical font sizing tied only to the responsive window-resolution scale.
+  io.ConfigDpiScaleFonts = false;
 
-  ImGui::StyleColorsDark();
+  FlightUI::ApplyDarkEditorTheme();
+  FlightUI::LoadPrimaryUIFont();
+  baseImGuiStyle_ = ImGui::GetStyle();
+  baseImPlotStyle_ = ImPlot::GetStyle();
+  UpdateUIScale(true);
 
   if (!ImGui_ImplGlfw_InitForOpenGL(window_, true)) {
     std::cerr << "Failed to initialize ImGui GLFW backend\n";
@@ -170,6 +205,7 @@ void GUI::BeginFrame() {
   }
 
   glfwPollEvents();
+  UpdateUIScale();
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
@@ -196,11 +232,12 @@ void GUI::EndFrame() {
   int displayHeight = 0;
   glfwGetFramebufferSize(window_, &displayWidth, &displayHeight);
 
+  const ImVec4 clearColor = FlightUI::GetDarkEditorApplicationBackground();
   glViewport(0, 0, displayWidth, displayHeight);
-  glClearColor(ClearColorR * ClearColorA,
-      ClearColorG * ClearColorA,
-      ClearColorB * ClearColorA,
-      ClearColorA);
+  glClearColor(clearColor.x * clearColor.w,
+      clearColor.y * clearColor.w,
+      clearColor.z * clearColor.w,
+      clearColor.w);
   glClear(GL_COLOR_BUFFER_BIT);
 
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -208,6 +245,37 @@ void GUI::EndFrame() {
 }
 
 // private
+void GUI::UpdateUIScale(bool force) {
+  int windowWidth = 0;
+  int windowHeight = 0;
+  glfwGetWindowSize(window_, &windowWidth, &windowHeight);
+  if (windowWidth <= 0 || windowHeight <= 0) {
+    return;
+  }
+
+  const float uiScale =
+      FlightUI::CalculateUIScale(static_cast<float>(windowWidth),
+          static_cast<float>(windowHeight));
+  if (!force && std::abs(uiScale - appliedUIScale_) < UIScaleChangeThreshold) {
+    return;
+  }
+
+  appliedUIScale_ = uiScale;
+  FlightUI::SetUIScale(uiScale);
+
+  ImGuiStyle scaledImGuiStyle = baseImGuiStyle_;
+  scaledImGuiStyle.ScaleAllSizes(uiScale);
+  // The current ImGui backend rasterizes dynamically requested font sizes,
+  // while framebuffer density remains a separate backend concern.
+  scaledImGuiStyle.FontScaleMain =
+      baseImGuiStyle_.FontScaleMain * FlightUI::CalculateUIFontScale(uiScale);
+  ImGui::GetStyle() = scaledImGuiStyle;
+
+  ImPlotStyle scaledImPlotStyle = baseImPlotStyle_;
+  ScaleImPlotStyle(scaledImPlotStyle, uiScale);
+  ImPlot::GetStyle() = scaledImPlotStyle;
+}
+
 void GUI::RenderDockSpace() { ImGui::DockSpaceOverViewport(); }
 
 void GUI::RenderMainMenuBar() {

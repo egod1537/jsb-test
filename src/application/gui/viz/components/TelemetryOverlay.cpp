@@ -1,6 +1,7 @@
 #include "application/gui/viz/components/TelemetryOverlay.hpp"
 
 #include "application/gui/viz/render/LineCanvas.hpp"
+#include "flightui/core/UIScale.hpp"
 
 #include <cstdio>
 
@@ -12,9 +13,9 @@ void TelemetryOverlay::Render(RenderContext &context) const {
 
   const auto &aircraftState = context.snapshot.aircraftState;
   const auto &controlInput = context.snapshot.controlInput;
-  const char *viewMode =
-      context.snapshot.viewMode == ViewMode::ThirdPerson ? "Third Person"
-                                                         : "Orbit";
+  const char *viewMode = context.snapshot.viewMode == ViewMode::ThirdPerson
+                             ? "Third Person"
+                             : "Orbit";
   const ImVec2 min = context.canvas.GetMin();
   ImDrawList &drawList = context.canvas.GetDrawList();
 
@@ -24,7 +25,8 @@ void TelemetryOverlay::Render(RenderContext &context) const {
       "t %.2f  View %s",
       aircraftState.simulationTimeSec,
       viewMode);
-  drawList.AddText(ImVec2(min.x + 10.0F, min.y + 10.0F),
+  drawList.AddText(
+      ImVec2(min.x + FlightUI::Ui(10.0F), min.y + FlightUI::Ui(10.0F)),
       IM_COL32(232, 238, 246, 255),
       line);
 
@@ -34,7 +36,8 @@ void TelemetryOverlay::Render(RenderContext &context) const {
       aircraftState.altitudeAglFt,
       aircraftState.calibratedAirspeedKts,
       aircraftState.trueAirspeedMps);
-  drawList.AddText(ImVec2(min.x + 10.0F, min.y + 30.0F),
+  drawList.AddText(
+      ImVec2(min.x + FlightUI::Ui(10.0F), min.y + FlightUI::Ui(30.0F)),
       IM_COL32(232, 238, 246, 255),
       line);
 
@@ -44,7 +47,8 @@ void TelemetryOverlay::Render(RenderContext &context) const {
       aircraftState.rollDeg,
       aircraftState.pitchDeg,
       aircraftState.headingDeg);
-  drawList.AddText(ImVec2(min.x + 10.0F, min.y + 50.0F),
+  drawList.AddText(
+      ImVec2(min.x + FlightUI::Ui(10.0F), min.y + FlightUI::Ui(50.0F)),
       IM_COL32(232, 238, 246, 255),
       line);
 
@@ -56,7 +60,8 @@ void TelemetryOverlay::Render(RenderContext &context) const {
       controlInput.rudder,
       controlInput.throttle,
       context.snapshot.pitchTrim);
-  drawList.AddText(ImVec2(min.x + 10.0F, min.y + 70.0F),
+  drawList.AddText(
+      ImVec2(min.x + FlightUI::Ui(10.0F), min.y + FlightUI::Ui(70.0F)),
       IM_COL32(178, 189, 202, 255),
       line);
 }

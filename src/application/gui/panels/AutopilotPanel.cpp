@@ -171,6 +171,36 @@ UI::UIElement MakePitchHoldSection(const AutopilotPanelProps &props) {
       .responseOpen = state.pitchHoldResponseOpen,
   });
 }
+
+UI::UIElement MakeCourseHoldSection(AutopilotPanelState &state) {
+  UI::VerticalLayoutBuilder layout = UI::VerticalLayout().Spacing(6.0F)
+                                     + MakeAutopilotHoldRow("Course Hold",
+                                         "Course (deg)",
+                                         "##CourseHoldTarget",
+                                         state.courseHold,
+                                         state.courseTargetDeg);
+
+  if (state.courseHold) {
+    layout = layout
+             + UI::FoldOut("Course Hold Response")
+                   .Open(state.courseHoldResponseOpen)
+                   .SpanAvailWidth()
+                   .Id("CourseHoldResponse")[UI::VerticalLayout().Spacing(
+                       6.0F)[+MakeAutopilotParameterSlider("Damping Ratio",
+                                 "##CourseHoldDampingRatio",
+                                 state.courseHoldDampingRatio,
+                                 0.1,
+                                 2.0)
+                             + MakeAutopilotParameterSlider(
+                                 "Natural Frequency (rad/s)",
+                                 "##CourseHoldNaturalFrequency",
+                                 state.courseHoldNaturalFrequencyRadPerSec,
+                                 0.01,
+                                 2.0)]];
+  }
+
+  return layout;
+}
 } // namespace
 
 void AutopilotPanel::Draw(AutopilotPanelState &state) {
@@ -194,11 +224,7 @@ void AutopilotPanel::Draw(const AutopilotPanelProps &props) {
                          state.altitudeTargetFt,
                          100.0,
                          1000.0)
-                     + MakeAutopilotHoldRow("Course Hold",
-                         "Course (deg)",
-                         "##CourseHoldTarget",
-                         state.courseHold,
-                         state.courseTargetDeg)]
+                     + MakeCourseHoldSection(state)]
       .Render();
 }
 } // namespace gui

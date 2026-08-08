@@ -5,6 +5,7 @@
 #include "application/sim/control/IFlightControlSource.hpp"
 #include "application/sim/gnc/Controller.hpp"
 #include "application/sim/gnc/hold/AirspeedHoldController.hpp"
+#include "application/sim/gnc/hold/CourseHoldController.hpp"
 #include "application/sim/gnc/hold/PitchHoldController.hpp"
 #include "application/sim/gnc/hold/PitchDynamics.hpp"
 #include "application/sim/gnc/hold/RollDynamics.hpp"
@@ -15,6 +16,8 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -55,14 +58,21 @@ public:
   void SetRollHoldEnabled(bool enabled);
   bool IsPitchHoldEnabled() const;
   void SetPitchHoldEnabled(bool enabled);
+  bool IsCourseHoldEnabled() const;
+  void SetCourseHoldEnabled(bool enabled);
 
   // Hold settings
   void SetRollHoldSettings(const RollHoldSettings &settings);
   const RollHoldSettings &GetRollHoldSettings() const;
   void SetPitchHoldSettings(const PitchHoldSettings &settings);
   const PitchHoldSettings &GetPitchHoldSettings() const;
+  void SetCourseHoldSettings(const CourseHoldSettings &settings);
+  const CourseHoldSettings &GetCourseHoldSettings() const;
 
   // Linearization
+  bool IsLinearizationInProgress() const;
+  const LinearizationResult *GetLinearizationResult() const;
+  std::string_view GetLinearizationErrorMessage() const;
   std::optional<RollDynamics> GetRollDynamics() const;
   std::optional<PitchDynamics> GetPitchDynamics() const;
 
@@ -74,6 +84,8 @@ private:
 
   // Aircraft dynamics
   void UpdateLinearization(sim::Aircraft &aircraft, const sim::Tick &tick);
+  void PollLinearization();
+  bool SubmitLinearization(sim::Aircraft &aircraft, double simulationTimeSec);
   void InvalidateLinearization();
 
   // Input dependency
@@ -88,6 +100,7 @@ private:
   // Aircraft dynamics
   std::unique_ptr<sim::AsyncAircraftLinearizer> asyncLinearizer_;
   std::optional<LinearizationResult> linearization_;
+  std::string linearizationErrorMessage_;
   std::optional<double> lastLinearizationRequestSimTimeSec_;
   std::uint64_t linearizationGeneration_ = 0;
 };

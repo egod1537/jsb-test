@@ -8,6 +8,7 @@
 #include "application/gui/viz/components/TelemetryOverlay.hpp"
 #include "application/gui/viz/render/CameraComponent.hpp"
 #include "application/gui/viz/render/LineCanvas.hpp"
+#include "flightui/core/UIScale.hpp"
 
 #include <imgui.h>
 
@@ -15,8 +16,6 @@
 #include <cmath>
 
 namespace {
-constexpr float MinCanvasWidth = 360.0F;
-constexpr float MinCanvasHeight = 280.0F;
 constexpr float MinVisualAltitude = 0.35F;
 constexpr float MaxVisualAltitude = 52.0F;
 constexpr float LinearAltitudeBreakFt = 1800.0F;
@@ -32,11 +31,11 @@ float VisualAltitudeFromAglFt(double altitudeAglFt) {
     return MinVisualAltitude;
   }
 
-  const float altitudeFt =
-      static_cast<float>(std::max(altitudeAglFt, 0.0));
+  const float altitudeFt = static_cast<float>(std::max(altitudeAglFt, 0.0));
   if (altitudeFt <= LinearAltitudeBreakFt) {
-    return std::clamp(
-        altitudeFt / FeetPerVizUnit, MinVisualAltitude, MaxVisualAltitude);
+    return std::clamp(altitudeFt / FeetPerVizUnit,
+        MinVisualAltitude,
+        MaxVisualAltitude);
   }
 
   const float linearAltitude = LinearAltitudeBreakFt / FeetPerVizUnit;
@@ -44,8 +43,7 @@ float VisualAltitudeFromAglFt(double altitudeAglFt) {
       linearAltitude
       + std::log1p((altitudeFt - LinearAltitudeBreakFt) / HighAltitudeLogFt)
             * HighAltitudeLogScale;
-  return std::clamp(
-      compressedAltitude, MinVisualAltitude, MaxVisualAltitude);
+  return std::clamp(compressedAltitude, MinVisualAltitude, MaxVisualAltitude);
 }
 
 float HorizontalSpeedMps(const sim::AircraftState &state) {
@@ -55,8 +53,8 @@ float HorizontalSpeedMps(const sim::AircraftState &state) {
 
   if (std::isfinite(state.calibratedAirspeedKts)
       && state.calibratedAirspeedKts > 0.1) {
-    return static_cast<float>(state.calibratedAirspeedKts
-                              * KnotsToMetersPerSec);
+    return static_cast<float>(
+        state.calibratedAirspeedKts * KnotsToMetersPerSec);
   }
 
   return 0.0F;
@@ -97,8 +95,8 @@ void FlightVisualizer::RenderScene() {
 
   const ImVec2 available = ImGui::GetContentRegionAvail();
   const ImVec2 size{
-      std::max(available.x, MinCanvasWidth),
-      std::max(available.y, MinCanvasHeight),
+      std::max(available.x, 1.0F),
+      std::max(available.y, 1.0F),
   };
 
   ImGui::SetNextItemAllowOverlap();
@@ -145,9 +143,10 @@ void FlightVisualizer::RenderViewOptionsMenu(ImVec2 min, ImVec2 max) {
 
   ImGui::PushID("FlightVizViewOptions");
   ImGui::SetCursorScreenPos(
-      ImVec2(max.x - ButtonWidth - Padding, min.y + Padding));
+      ImVec2(max.x - FlightUI::Ui(ButtonWidth) - FlightUI::Ui(Padding),
+          min.y + FlightUI::Ui(Padding)));
 
-  if (ImGui::Button("View", ImVec2(ButtonWidth, 0.0F))) {
+  if (ImGui::Button("View", ImVec2(FlightUI::Ui(ButtonWidth), 0.0F))) {
     ImGui::OpenPopup("ViewOptions");
   }
 
@@ -161,8 +160,8 @@ void FlightVisualizer::RenderViewOptionsMenu(ImVec2 min, ImVec2 max) {
 }
 
 void FlightVisualizer::ToggleViewMode() {
-  viewMode_ = viewMode_ == ViewMode::Orbit ? ViewMode::ThirdPerson
-                                           : ViewMode::Orbit;
+  viewMode_ =
+      viewMode_ == ViewMode::Orbit ? ViewMode::ThirdPerson : ViewMode::Orbit;
 }
 
 void FlightVisualizer::SyncGroundScroll(const sim::AircraftState &state) {

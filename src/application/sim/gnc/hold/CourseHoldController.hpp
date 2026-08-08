@@ -2,11 +2,20 @@
 
 #include "application/sim/gnc/Controller.hpp"
 
+#include <optional>
+
+namespace sim {
+class Aircraft;
+struct Tick;
+} // namespace sim
+
 namespace gnc {
+struct ControlContext;
+
 struct CourseHoldSettings {
   double targetCourseRad = 0.0;
-  double proportionalGain = 0.5;
-  double derivativeGain = 2.0;
+  double dampingRatio = 0.7;
+  double naturalFrequencyRadPerSec = 0.2;
 };
 
 class CourseHoldController final : public Controller {
@@ -19,12 +28,13 @@ public:
   const CourseHoldSettings &GetSettings() const;
   void SetSettings(const CourseHoldSettings &settings);
 
-  double GetTrimAileron() const;
-  void SetTrimAileron(double trimAileron);
+  std::optional<double> OnTick(const sim::Aircraft &aircraft,
+      const sim::Tick &tick, const ControlContext &context);
 
 private:
   bool enabled_ = false;
   CourseHoldSettings settings_;
-  double trimAileron_ = 0.0;
+  double integralCourseErrorRadSec_ = 0.0;
+  double prevError_ = 0.0;
 };
 } // namespace gnc

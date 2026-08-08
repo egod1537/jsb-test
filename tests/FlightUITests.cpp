@@ -1,6 +1,7 @@
 #include "flightui/FlightUI.hpp"
 
 #include <cassert>
+#include <cmath>
 #include <imgui.h>
 #include <implot.h>
 #include <string>
@@ -90,6 +91,27 @@ static_assert(requires(bool isOpen) {
 });
 
 int main() {
+  constexpr float ScaleTolerance = 0.0001F;
+  assert(
+      std::abs(UI::CalculateUIScale(1280.0F, 720.0F) - 1.0F) < ScaleTolerance);
+  assert(
+      std::abs(UI::CalculateUIScale(1024.0F, 768.0F) - 0.8F) < ScaleTolerance);
+  assert(std::abs(UI::CalculateUIScale(640.0F, 360.0F) - UI::MinimumUIScale)
+         < ScaleTolerance);
+  assert(std::abs(UI::CalculateUIScale(3840.0F, 2160.0F) - UI::MaximumUIScale)
+         < ScaleTolerance);
+
+  UI::SetUIScale(UI::CalculateUIScale(1920.0F, 1080.0F));
+  assert(std::abs(UI::Ui(100.0F) - 150.0F) < ScaleTolerance);
+  UI::SetUIScale(UI::CalculateUIScale(1024.0F, 768.0F));
+  assert(std::abs(UI::Ui(100.0F) - 80.0F) < ScaleTolerance);
+  const UI::Vector2 scaledPlotSize = UI::UiSize({-1.0F, 245.0F});
+  assert(scaledPlotSize.X == -1.0F);
+  assert(std::abs(scaledPlotSize.Y - 196.0F) < ScaleTolerance);
+  UI::SetUIScale(UI::CalculateUIScale(1920.0F, 1080.0F));
+  assert(std::abs(UI::Ui(100.0F) - 150.0F) < ScaleTolerance);
+  UI::SetUIScale(1.0F);
+
   std::vector<double> xValues{0.0, 1.0, 2.0};
   std::vector<double> yValues{0.0, 1.0, 4.0};
   const UI::DataView xView = UI::DataView::From(xValues);
@@ -121,6 +143,39 @@ int main() {
 
   ImGui::CreateContext();
   ImPlot::CreateContext();
+  UI::ApplyDarkEditorTheme();
+  assert(UI::LoadPrimaryUIFont());
+  assert(UI::GetPrimaryUIFontPath().filename() == "Inter-Regular.ttf");
+
+  const ImGuiStyle &darkEditorStyle = ImGui::GetStyle();
+  const ImPlotStyle &darkEditorPlotStyle = ImPlot::GetStyle();
+  assert(std::abs(darkEditorStyle.Colors[ImGuiCol_WindowBg].x - 37.0F / 255.0F)
+         < ScaleTolerance);
+  assert(
+      std::abs(darkEditorStyle.Colors[ImGuiCol_CheckMark].z - 206.0F / 255.0F)
+      < ScaleTolerance);
+  assert(darkEditorStyle.WindowRounding == 3.0F);
+  assert(darkEditorStyle.FrameRounding == 2.0F);
+  assert(darkEditorStyle.Colors[ImGuiCol_Button].x
+         < darkEditorStyle.Colors[ImGuiCol_ButtonHovered].x);
+  assert(darkEditorPlotStyle.Colors[ImPlotCol_PlotBg].x
+         < darkEditorPlotStyle.Colors[ImPlotCol_FrameBg].x);
+  assert(darkEditorPlotStyle.Colors[ImPlotCol_AxisGrid].w < 0.25F);
+  assert(ImGui::GetIO().Fonts->Fonts.Size == 1);
+  assert(ImGui::GetIO().FontDefault != nullptr);
+  assert(std::abs(ImGui::GetIO().FontDefault->LegacySize - UI::BaseUIFontSize)
+         < ScaleTolerance);
+  assert(std::abs(UI::CalculateUIFontScale(1.0F) - 1.0F) < ScaleTolerance);
+  assert(std::abs(UI::CalculateUIFontScale(0.7F) * UI::BaseUIFontSize
+                  - UI::MinimumUIFontSize)
+         < ScaleTolerance);
+  const float largeFontScale = UI::CalculateUIFontScale(1.5F);
+  const float smallFontScale = UI::CalculateUIFontScale(0.8F);
+  const float restoredFontScale = UI::CalculateUIFontScale(1.5F);
+  assert(std::abs(smallFontScale * UI::BaseUIFontSize - UI::MinimumUIFontSize)
+         < ScaleTolerance);
+  assert(std::abs(restoredFontScale - largeFontScale) < ScaleTolerance);
+  assert(std::abs(UI::CalculateUIFontScale(1.5F) - 1.5F) < ScaleTolerance);
 
   ImGuiIO &io = ImGui::GetIO();
   io.DisplaySize = ImVec2(800.0F, 600.0F);
@@ -129,6 +184,11 @@ int main() {
   int fontWidth = 0;
   int fontHeight = 0;
   io.Fonts->GetTexDataAsRGBA32(&fontPixels, &fontWidth, &fontHeight);
+  ImFontBaked *interRegular = io.FontDefault->GetFontBaked(UI::BaseUIFontSize);
+  assert(interRegular->FindGlyphNoFallback('A') != nullptr);
+  assert(interRegular->FindGlyphNoFallback('0') != nullptr);
+  assert(interRegular->FindGlyphNoFallback('%') != nullptr);
+  assert(interRegular->FindGlyphNoFallback('/') != nullptr);
 
   bool isOpen = true;
   bool isTabOpen = true;

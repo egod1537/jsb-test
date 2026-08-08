@@ -5,6 +5,7 @@
 #include "flightui/layout/HorizontalLayout.hpp"
 #include "flightui/layout/VerticalLayout.hpp"
 #include "flightui/plot/Plot.hpp"
+#include "flightui/core/UIScale.hpp"
 #include "application/gui/GUI.hpp"
 #include "application/sim/Aircraft.hpp"
 #include "application/sim/AircraftState.hpp"
@@ -270,7 +271,7 @@ void FlightDataMonitorWindow::DrawCurrentValues(
 void FlightDataMonitorWindow::DrawPlotSelector() {
   ImGui::PushID("MonitorPlotSelector");
 
-  if (ImGui::Button("Plots", ImVec2(PlotSelectorButtonWidth, 0.0f))) {
+  if (ImGui::Button("Plots", ImVec2(UI::Ui(PlotSelectorButtonWidth), 0.0f))) {
     ImGui::OpenPopup("PlotOptions");
   }
 
@@ -304,7 +305,7 @@ void FlightDataMonitorWindow::DrawPlotGrid() const {
 
   const float availableWidth = ImGui::GetContentRegionAvail().x;
   const int columnCount =
-      availableWidth >= PlotGridMinColumnWidth * 2.0f ? 2 : 1;
+      availableWidth >= UI::Ui(PlotGridMinColumnWidth * 2.0f) ? 2 : 1;
   constexpr ImGuiTableFlags Flags =
       ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings;
 
@@ -324,7 +325,7 @@ void FlightDataMonitorWindow::DrawPlotGrid() const {
 
     ImGui::TableNextColumn();
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
-        ImVec2(PlotGridColumnSpacing, 8.0f));
+        ImVec2(UI::Ui(PlotGridColumnSpacing), UI::Ui(8.0f)));
     UI::FoldOut(title)
         .DefaultOpen()
         .Framed()

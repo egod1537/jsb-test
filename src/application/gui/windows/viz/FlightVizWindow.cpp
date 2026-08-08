@@ -10,13 +10,15 @@
 #include <imgui.h>
 #include <string>
 
+namespace UI = FlightUI;
+
 namespace {
 constexpr float RuntimePanelHeight = 52.0F;
 constexpr float RuntimeControlSpacing = 8.0F;
 constexpr float TransportButtonSize = 36.0F;
 constexpr float SpeedButtonWidth = 40.0F;
 constexpr float ControlCornerRadius = 6.0F;
-constexpr std::array<int, 4> SimulationSpeeds = {1, 2, 3, 4};
+constexpr std::array<int, 3> SimulationSpeeds = {1, 2, 3};
 
 enum class TransportIcon {
   Pause,
@@ -29,41 +31,45 @@ ImVec2 Offset(ImVec2 point, float x, float y) {
   return {point.x + x, point.y + y};
 }
 
+ImVec2 UiOffset(ImVec2 point, float x, float y) {
+  return Offset(point, UI::Ui(x), UI::Ui(y));
+}
+
 void DrawTransportIcon(ImDrawList &drawList, TransportIcon icon, ImVec2 center,
     ImU32 color) {
   switch (icon) {
   case TransportIcon::Pause:
-    drawList.AddRectFilled(Offset(center, -6.0F, -8.0F),
-        Offset(center, -2.0F, 8.0F),
+    drawList.AddRectFilled(UiOffset(center, -6.0F, -8.0F),
+        UiOffset(center, -2.0F, 8.0F),
         color,
-        1.0F);
-    drawList.AddRectFilled(Offset(center, 2.0F, -8.0F),
-        Offset(center, 6.0F, 8.0F),
+        UI::Ui(1.0F));
+    drawList.AddRectFilled(UiOffset(center, 2.0F, -8.0F),
+        UiOffset(center, 6.0F, 8.0F),
         color,
-        1.0F);
+        UI::Ui(1.0F));
     break;
   case TransportIcon::Step:
-    drawList.AddTriangleFilled(Offset(center, -7.0F, -8.0F),
-        Offset(center, -7.0F, 8.0F),
-        Offset(center, 5.0F, 0.0F),
+    drawList.AddTriangleFilled(UiOffset(center, -7.0F, -8.0F),
+        UiOffset(center, -7.0F, 8.0F),
+        UiOffset(center, 5.0F, 0.0F),
         color);
-    drawList.AddRectFilled(Offset(center, 7.0F, -8.0F),
-        Offset(center, 10.0F, 8.0F),
+    drawList.AddRectFilled(UiOffset(center, 7.0F, -8.0F),
+        UiOffset(center, 10.0F, 8.0F),
         color,
-        1.0F);
+        UI::Ui(1.0F));
     break;
   case TransportIcon::Play:
-    drawList.AddTriangleFilled(Offset(center, -6.0F, -9.0F),
-        Offset(center, -6.0F, 9.0F),
-        Offset(center, 9.0F, 0.0F),
+    drawList.AddTriangleFilled(UiOffset(center, -6.0F, -9.0F),
+        UiOffset(center, -6.0F, 9.0F),
+        UiOffset(center, 9.0F, 0.0F),
         color);
     break;
   case TransportIcon::Reset:
-    drawList.PathArcTo(center, 8.0F, -0.75F, 4.35F, 24);
-    drawList.PathStroke(color, 0, 2.4F);
-    drawList.AddTriangleFilled(Offset(center, -7.5F, -6.5F),
-        Offset(center, -10.0F, -0.5F),
-        Offset(center, -3.5F, -2.5F),
+    drawList.PathArcTo(center, UI::Ui(8.0F), -0.75F, 4.35F, 24);
+    drawList.PathStroke(color, 0, UI::Ui(2.4F));
+    drawList.AddTriangleFilled(UiOffset(center, -7.5F, -6.5F),
+        UiOffset(center, -10.0F, -0.5F),
+        UiOffset(center, -3.5F, -2.5F),
         color);
     break;
   }
@@ -75,7 +81,7 @@ bool DrawTransportButton(const char *id, TransportIcon icon, bool enabled,
   ImGui::BeginDisabled(!enabled);
 
   const ImVec2 minimum = ImGui::GetCursorScreenPos();
-  const ImVec2 size{TransportButtonSize, TransportButtonSize};
+  const ImVec2 size{UI::Ui(TransportButtonSize), UI::Ui(TransportButtonSize)};
   const bool clicked = ImGui::InvisibleButton("##Button", size);
   const bool hovered =
       ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
@@ -95,11 +101,11 @@ bool DrawTransportButton(const char *id, TransportIcon icon, bool enabled,
   drawList->AddRectFilled(minimum,
       maximum,
       ImGui::GetColorU32(backgroundColor),
-      ControlCornerRadius);
+      UI::Ui(ControlCornerRadius));
   drawList->AddRect(minimum,
       maximum,
       ImGui::GetColorU32(ImGuiCol_Border),
-      ControlCornerRadius);
+      UI::Ui(ControlCornerRadius));
   DrawTransportIcon(*drawList,
       icon,
       Offset(minimum, size.x * 0.5F, size.y * 0.5F),
@@ -118,11 +124,11 @@ void DrawStatusBadge(application::SimulationExecutionState state) {
       state == application::SimulationExecutionState::Running;
   const char *label = application::ToString(state);
   const ImVec2 textSize = ImGui::CalcTextSize(label);
-  const ImVec2 size{textSize.x + 30.0F, TransportButtonSize};
+  const ImVec2 size{textSize.x + UI::Ui(30.0F), UI::Ui(TransportButtonSize)};
   const ImVec2 minimum = ImGui::GetCursorScreenPos();
   const ImVec2 maximum = Offset(minimum, size.x, size.y);
-  const ImVec4 accent = isRunning ? ImVec4(0.25F, 0.78F, 0.45F, 1.0F)
-                                  : ImVec4(0.95F, 0.66F, 0.22F, 1.0F);
+  const ImVec4 accent = UI::GetDarkEditorSemanticColor(
+      isRunning ? UI::SemanticColor::Success : UI::SemanticColor::Warning);
 
   ImGui::Dummy(size);
 
@@ -130,21 +136,23 @@ void DrawStatusBadge(application::SimulationExecutionState state) {
   drawList->AddRectFilled(minimum,
       maximum,
       ImGui::GetColorU32(ImVec4(accent.x, accent.y, accent.z, 0.13F)),
-      ControlCornerRadius);
+      UI::Ui(ControlCornerRadius));
   drawList->AddRect(minimum,
       maximum,
       ImGui::GetColorU32(ImVec4(accent.x, accent.y, accent.z, 0.55F)),
-      ControlCornerRadius);
-  drawList->AddCircleFilled(Offset(minimum, 12.0F, size.y * 0.5F),
-      3.5F,
+      UI::Ui(ControlCornerRadius));
+  drawList->AddCircleFilled(
+      Offset(UiOffset(minimum, 12.0F, 0.0F), 0.0F, size.y * 0.5F),
+      UI::Ui(3.5F),
       ImGui::GetColorU32(accent));
-  drawList->AddText(Offset(minimum, 21.0F, (size.y - textSize.y) * 0.5F),
+  drawList->AddText(Offset(UiOffset(minimum, 21.0F, 0.0F),
+                        0.0F,
+                        (size.y - textSize.y) * 0.5F),
       ImGui::GetColorU32(ImGuiCol_Text),
       label);
 }
 
-bool DrawSpeedButton(int speed, bool selected) {
-  const std::string label = std::to_string(speed) + "x";
+bool DrawSpeedButton(const char *label, bool selected, const char *tooltip) {
   if (selected) {
     ImGui::PushStyleColor(ImGuiCol_Button,
         ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
@@ -152,15 +160,15 @@ bool DrawSpeedButton(int speed, bool selected) {
         ImGui::GetStyleColorVec4(ImGuiCol_CheckMark));
   }
 
-  const bool clicked =
-      ImGui::Button(label.c_str(), {SpeedButtonWidth, TransportButtonSize});
+  const bool clicked = ImGui::Button(label,
+      {UI::Ui(SpeedButtonWidth), UI::Ui(TransportButtonSize)});
 
   if (selected) {
     ImGui::PopStyleColor(2);
   }
 
-  if (ImGui::IsItemHovered()) {
-    ImGui::SetTooltip("Run at %dx speed", speed);
+  if (ImGui::IsItemHovered() && tooltip != nullptr) {
+    ImGui::SetTooltip("%s", tooltip);
   }
 
   return clicked;
@@ -168,8 +176,6 @@ bool DrawSpeedButton(int speed, bool selected) {
 } // namespace
 
 namespace gui {
-namespace UI = FlightUI;
-
 FlightVizWindow::FlightVizWindow() : Window("Flight Viz") {}
 
 void FlightVizWindow::OnRender(gui::GUI &gui) {
@@ -207,7 +213,7 @@ void FlightVizWindow::DrawRuntimePanel(gui::GUI &gui) {
               executionControl.PauseSimulation();
             }
 
-            ImGui::SameLine(0.0F, RuntimeControlSpacing);
+            ImGui::SameLine(0.0F, UI::Ui(RuntimeControlSpacing));
             if (DrawTransportButton("StepSimulation",
                     TransportIcon::Step,
                     isPaused,
@@ -215,7 +221,7 @@ void FlightVizWindow::DrawRuntimePanel(gui::GUI &gui) {
               executionControl.RequestSimulationTick();
             }
 
-            ImGui::SameLine(0.0F, RuntimeControlSpacing);
+            ImGui::SameLine(0.0F, UI::Ui(RuntimeControlSpacing));
             if (DrawTransportButton("RunSimulation",
                     TransportIcon::Play,
                     isPaused,
@@ -223,7 +229,7 @@ void FlightVizWindow::DrawRuntimePanel(gui::GUI &gui) {
               executionControl.ResumeSimulation();
             }
 
-            ImGui::SameLine(0.0F, RuntimeControlSpacing);
+            ImGui::SameLine(0.0F, UI::Ui(RuntimeControlSpacing));
             if (DrawTransportButton("ResetSimulation",
                     TransportIcon::Reset,
                     executionState
@@ -236,24 +242,37 @@ void FlightVizWindow::DrawRuntimePanel(gui::GUI &gui) {
               }
             }
 
-            ImGui::SameLine(0.0F, RuntimeControlSpacing);
+            ImGui::SameLine(0.0F, UI::Ui(RuntimeControlSpacing));
             DrawStatusBadge(executionState);
-            ImGui::SameLine(0.0F, RuntimeControlSpacing * 2.0F);
+            ImGui::SameLine(0.0F, UI::Ui(RuntimeControlSpacing * 2.0F));
             ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("Speed");
 
             const double automaticHz =
                 executionControl.GetAutomaticSimulationHz();
+            const bool maximumSpeed =
+                executionControl.IsMaximumSimulationSpeedEnabled();
             for (const int speed : SimulationSpeeds) {
-              ImGui::SameLine(0.0F, 4.0F);
+              ImGui::SameLine(0.0F, UI::Ui(4.0F));
               const double speedHz = sim::DefaultSimulationHz * speed;
-              if (DrawSpeedButton(speed,
-                      std::abs(automaticHz - speedHz) < 0.5)) {
+              const std::string label = std::to_string(speed) + "x";
+              const std::string tooltip =
+                  "Run at " + std::to_string(speed) + "x speed";
+              if (DrawSpeedButton(label.c_str(),
+                      !maximumSpeed && std::abs(automaticHz - speedHz) < 0.5,
+                      tooltip.c_str())) {
                 executionControl.SetAutomaticSimulationHz(speedHz);
               }
             }
 
-            ImGui::SameLine(0.0F, RuntimeControlSpacing * 2.0F);
+            ImGui::SameLine(0.0F, UI::Ui(4.0F));
+            if (DrawSpeedButton("Max",
+                    maximumSpeed,
+                    "Run as fast as the CPU allows")) {
+              executionControl.SetMaximumSimulationSpeedEnabled(true);
+            }
+
+            ImGui::SameLine(0.0F, UI::Ui(RuntimeControlSpacing * 2.0F));
             ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("30 Hz fixed tick");
           })]

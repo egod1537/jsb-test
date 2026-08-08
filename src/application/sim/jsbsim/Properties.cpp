@@ -13,6 +13,9 @@ constexpr const char *TrueAirspeedKts = "velocities/vtrue-kts";
 constexpr const char *TrueAirspeedFps = "velocities/vtrue-fps";
 constexpr const char *NorthVelocityFps = "velocities/v-north-fps";
 constexpr const char *EastVelocityFps = "velocities/v-east-fps";
+constexpr const char *GroundSpeedFps = "velocities/vg-fps";
+constexpr const char *CourseRad = "flight-path/psi-gt-rad";
+constexpr const char *GravityFtPerSec2 = "accelerations/gravity-ft_sec2";
 constexpr const char *UFps = "velocities/u-fps";
 constexpr const char *VFps = "velocities/v-fps";
 constexpr const char *WFps = "velocities/w-fps";
@@ -293,6 +296,18 @@ SpeedView Properties::NorthVelocity() const {
 
 SpeedView Properties::EastVelocity() const {
   return SpeedView(*this, EastVelocityFps, nullptr);
+}
+
+SpeedView Properties::GroundSpeed() const {
+  return SpeedView(*this, GroundSpeedFps, nullptr);
+}
+
+AngleView Properties::Course() const {
+  return AngleView(*this, CourseRad, nullptr);
+}
+
+double Properties::GravityMps2() const {
+  return FeetPerSec2ToMetersPerSec2(Get(GravityFtPerSec2));
 }
 
 LinearVelocityView Properties::U() const {

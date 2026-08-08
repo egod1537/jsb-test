@@ -6,6 +6,8 @@
 #include "application/gui/Window.hpp"
 #include "application/sim/Simulation.hpp"
 #include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <implot.h>
 #include <memory>
 #include <type_traits>
 #include <utility>
@@ -87,6 +89,7 @@ private:
   void EndFrame();
 
   // Rendering
+  void UpdateUIScale(bool force = false);
   void RenderDockSpace();
   void RenderMainMenuBar();
   void RenderSimulationMenu();
@@ -103,6 +106,11 @@ private:
   bool imguiContextCreated_ = false;
   bool glfwBackendInitialized_ = false;
   bool openGlBackendInitialized_ = false;
+
+  // Responsive UI state
+  ImGuiStyle baseImGuiStyle_;
+  ImPlotStyle baseImPlotStyle_;
+  float appliedUIScale_ = 0.0F;
 
   // UI ownership
   std::vector<std::unique_ptr<Component>> components_;

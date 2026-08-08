@@ -558,6 +558,49 @@ void TestAircraftStateAccess() {
       "Flight properties beta rad invalid");
 }
 
+void TestNavigationProperties() {
+  sim::Aircraft aircraft;
+  sim::InitialCondition initialCondition{};
+  initialCondition.headingDeg = 0.0;
+  initialCondition.airspeedKts = 100.0;
+  Require(aircraft.Initialize(MakeConfig(), initialCondition),
+      "Aircraft failed to initialize for navigation property test");
+
+  sim::FDMState state = aircraft.ExtractFDMState(sim::FDMStateFlags::State);
+  state.state.bodyVelocityFps = {120.0, 80.0, 0.0};
+  state.state.attitudeRad = {0.0, 0.0, 0.0};
+  aircraft.ApplyFDMState(state);
+  Require(aircraft.Tick(), "Navigation property test tick failed");
+
+  const sim::jsbsim::Properties &properties = aircraft.GetProperties();
+  const double northVelocityFps = properties.NorthVelocity().Fps();
+  const double eastVelocityFps = properties.EastVelocity().Fps();
+  const double expectedGroundSpeedFps =
+      std::hypot(northVelocityFps, eastVelocityFps);
+  RequireNear(properties.GroundSpeed().Fps(),
+      expectedGroundSpeedFps,
+      SimTimeTolerance,
+      "Ground speed does not match horizontal navigation velocity");
+  RequireNear(properties.GroundSpeed().Mps(),
+      expectedGroundSpeedFps * 0.3048,
+      SimTimeTolerance,
+      "Ground speed metric conversion mismatch");
+
+  const double expectedCourseRad =
+      std::atan2(eastVelocityFps, northVelocityFps);
+  RequireNear(properties.Course().Rad(),
+      expectedCourseRad,
+      SimTimeTolerance,
+      "Course does not match horizontal ground-track direction");
+  const double headingRad = aircraft.GetAircraftState().headingDeg * DegToRad;
+  Require(std::fabs(properties.Course().Rad() - headingRad) > 0.1,
+      "Course accessor returned aircraft heading instead of ground track");
+
+  const double gravityMps2 = properties.GravityMps2();
+  Require(gravityMps2 > 8.0 && gravityMps2 < 11.0,
+      "Local gravitational acceleration is not physically reasonable");
+}
+
 void TestStartAppliesInitialTrim() {
   sim::Simulation simulation;
   StartSimulation(simulation);
@@ -876,6 +919,92 @@ void TestRollHoldControllerComputesAileronCommand() {
       expectedAileron,
       SimTimeTolerance,
       "Roll hold aileron command mismatch");
+
+  const double commandedRollRad = properties.Roll().Rad() - 0.15;
+  rollHold->SetEnabled(false);
+  const auto cascadedCommand = rollHold->OnTick(aircraft,
+      MakeTestTick(simulation),
+      context,
+      commandedRollRad);
+  Require(cascadedCommand.has_value(),
+      "Roll hold rejected an outer-loop roll command");
+  const double expectedCascadedAileron =
+      0.1
+      + ComputeRollProportionalGain(settings, dynamics)
+            * (commandedRollRad - properties.Roll().Rad())
+      - ComputeRollDerivativeGain(settings, dynamics)
+            * properties.P().RadPerSec();
+  RequireNear(*cascadedCommand,
+      expectedCascadedAileron,
+      SimTimeTolerance,
+      "Roll hold did not use the outer-loop roll command");
+  RequireNear(rollHold->GetSettings().targetRollRad,
+      settings.targetRollRad,
+      SimTimeTolerance,
+      "Outer-loop roll command replaced the standalone Roll Hold target");
+}
+
+void TestCourseHoldCommandInterface() {
+  sim::Simulation simulation;
+  StartSimulation(simulation);
+  auto &autopilot = GetFlightControlManager(simulation).GetAutopilot();
+  auto *courseHold = autopilot.GetController<gnc::CourseHoldController>();
+  Require(courseHold != nullptr, "Autopilot is missing CourseHoldController");
+
+  const gnc::CourseHoldSettings settings{
+      .targetCourseRad = 1.2,
+      .dampingRatio = 0.8,
+      .naturalFrequencyRadPerSec = 0.25,
+  };
+  autopilot.SetCourseHoldSettings(settings);
+  autopilot.SetCourseHoldEnabled(false);
+  const gnc::ControlContext context{
+      .rollDynamics =
+          gnc::RollDynamics{
+              .aPhi1 = 0.4,
+              .aPhi2 = 2.0,
+          },
+      .rollHoldSettings =
+          gnc::RollHoldSettings{
+              .targetRollRad = 0.1,
+              .dampingRatio = 0.7,
+              .naturalFrequencyRadPerSec = 3.0,
+          },
+  };
+  Require(context.rollHoldSettings.has_value(),
+      "Course Hold context is missing Roll Hold settings");
+  RequireNear(context.rollHoldSettings->naturalFrequencyRadPerSec,
+      3.0,
+      SimTimeTolerance,
+      "Course Hold context did not retain Roll Hold natural frequency");
+  Require(
+      !courseHold
+          ->OnTick(simulation.GetAircraft(), MakeTestTick(simulation), context)
+          .has_value(),
+      "Disabled Course Hold produced a roll command");
+
+  autopilot.SetCourseHoldEnabled(true);
+  Require(autopilot.IsCourseHoldEnabled(),
+      "Autopilot did not enable Course Hold");
+  RequireNear(autopilot.GetCourseHoldSettings().targetCourseRad,
+      settings.targetCourseRad,
+      SimTimeTolerance,
+      "Course Hold target was not retained");
+  RequireNear(autopilot.GetCourseHoldSettings().dampingRatio,
+      settings.dampingRatio,
+      SimTimeTolerance,
+      "Course Hold damping ratio was not retained");
+  RequireNear(autopilot.GetCourseHoldSettings().naturalFrequencyRadPerSec,
+      settings.naturalFrequencyRadPerSec,
+      SimTimeTolerance,
+      "Course Hold natural frequency was not retained");
+  Require(
+      !courseHold
+          ->OnTick(simulation.GetAircraft(), MakeTestTick(simulation), context)
+          .has_value(),
+      "Course Hold control law should remain unimplemented");
+
+  courseHold->Reset();
 }
 
 void TestPitchHoldControllerComputesElevatorCommand() {
@@ -988,6 +1117,22 @@ void TestAutopilotModeAppliesAutopilotSourceOutput() {
   Require(rollDynamics.has_value(), "Autopilot did not provide roll dynamics");
   Require(pitchDynamics.has_value(),
       "Autopilot did not provide pitch dynamics");
+  const gnc::LinearizationResult *linearization =
+      autopilot.GetLinearizationResult();
+  Require(linearization != nullptr,
+      "Autopilot did not publish the periodic linearization result");
+  Require(
+      linearization->A.rows()
+              == static_cast<Eigen::Index>(linearization->stateNames.size())
+          && linearization->A.cols()
+                 == static_cast<Eigen::Index>(linearization->stateNames.size()),
+      "Periodic system matrix dimensions do not match state names");
+  Require(
+      linearization->B.rows()
+              == static_cast<Eigen::Index>(linearization->stateNames.size())
+          && linearization->B.cols()
+                 == static_cast<Eigen::Index>(linearization->inputNames.size()),
+      "Periodic input matrix dimensions do not match state and input names");
 
   const double rollBeforeTick = properties.Roll().Rad();
   const double rollRateBeforeTick = properties.P().RadPerSec();
@@ -1428,6 +1573,7 @@ int main() {
     TestEngineStateInspection();
     TestInvalidInitialConditionFails();
     TestAircraftStateAccess();
+    TestNavigationProperties();
     TestStartAppliesInitialTrim();
     TestInitialTrimIsStoredInAutopilot();
     TestAutopilotControllerRegistry();
@@ -1438,6 +1584,7 @@ int main() {
     TestFlightControlManagerNoInputPreservesCommand();
     TestManualModeIgnoresAutopilotSource();
     TestRollHoldControllerComputesAileronCommand();
+    TestCourseHoldCommandInterface();
     TestPitchHoldControllerComputesElevatorCommand();
     TestAutopilotModeAppliesAutopilotSourceOutput();
     TestPitchHoldOnlyPassesThroughManualLateralAxes();

@@ -39,6 +39,8 @@ public:
   virtual void RequestSimulationTick() = 0;
   virtual double GetAutomaticSimulationHz() const = 0;
   virtual void SetAutomaticSimulationHz(double hz) = 0;
+  virtual bool IsMaximumSimulationSpeedEnabled() const = 0;
+  virtual void SetMaximumSimulationSpeedEnabled(bool enabled) = 0;
   virtual bool ResetSimulation() = 0;
   virtual bool ResetSimulation(
       const sim::InitialCondition &initialCondition) = 0;

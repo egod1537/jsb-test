@@ -43,14 +43,34 @@ control::ControlInput Autopilot::OnTick(sim::Aircraft &aircraft,
   control::ControlInput input = passthroughSource_.OnTick(aircraft, tick);
   UpdateLinearization(aircraft, tick);
 
+  RollHoldController *rollHold = GetController<RollHoldController>();
   const ControlContext context{
       .rollDynamics = GetRollDynamics(),
       .pitchDynamics = GetPitchDynamics(),
+      .rollHoldSettings = rollHold != nullptr ? std::optional<RollHoldSettings>(
+                                                    rollHold->GetSettings())
+                                              : std::nullopt,
   };
 
-  if (auto *rollHold = GetController<RollHoldController>()) {
+  CourseHoldController *courseHold = GetController<CourseHoldController>();
+  const bool courseHoldEnabled =
+      courseHold != nullptr && courseHold->IsEnabled();
+  const std::optional<double> commandedRollRad =
+      courseHoldEnabled ? courseHold->OnTick(aircraft, tick, context)
+                        : std::nullopt;
+
+  if (rollHold != nullptr) {
     if (context.rollDynamics) {
-      if (const auto aileron = rollHold->OnTick(aircraft, tick, context)) {
+      std::optional<double> aileron;
+      if (courseHoldEnabled) {
+        if (commandedRollRad) {
+          aileron =
+              rollHold->OnTick(aircraft, tick, context, *commandedRollRad);
+        }
+      } else {
+        aileron = rollHold->OnTick(aircraft, tick, context);
+      }
+      if (aileron) {
         input.aileron = *aileron;
       }
     }
@@ -123,22 +143,15 @@ std::optional<PitchDynamics> Autopilot::GetPitchDynamics() const {
 
 void Autopilot::UpdateLinearization(sim::Aircraft &aircraft,
     const sim::Tick &tick) {
-  if (auto completion = asyncLinearizer_->TakeCompletion()) {
-    if (completion->generation == linearizationGeneration_) {
-      lastLinearizationRequestSimTimeSec_ = tick.simTimeSec;
-      if (completion->linearization) {
-        linearization_ = std::move(completion->linearization);
-      } else if (!completion->errorMessage.empty()) {
-        std::cerr << "[Autopilot] " << completion->errorMessage << '\n';
-      }
-    }
-  }
+  PollLinearization();
 
   const auto *rollHold = GetController<RollHoldController>();
   const auto *pitchHold = GetController<PitchHoldController>();
+  const auto *courseHold = GetController<CourseHoldController>();
   const bool dynamicsRequired =
       (rollHold != nullptr && rollHold->IsEnabled())
-      || (pitchHold != nullptr && pitchHold->IsEnabled());
+      || (pitchHold != nullptr && pitchHold->IsEnabled())
+      || (courseHold != nullptr && courseHold->IsEnabled());
   if (!dynamicsRequired || asyncLinearizer_->IsBusy()) {
     return;
   }
@@ -150,8 +163,41 @@ void Autopilot::UpdateLinearization(sim::Aircraft &aircraft,
       !lastLinearizationRequestSimTimeSec_ || simulationTimeReset
       || tick.simTimeSec - *lastLinearizationRequestSimTimeSec_
              >= LinearizationRefreshIntervalSec;
-  if (!refreshDue) {
-    return;
+  if (refreshDue) {
+    SubmitLinearization(aircraft, tick.simTimeSec);
+  }
+}
+
+void Autopilot::PollLinearization() {
+  if (auto completion = asyncLinearizer_->TakeCompletion()) {
+    if (completion->generation == linearizationGeneration_) {
+      if (completion->linearization) {
+        linearization_ = std::move(completion->linearization);
+        linearizationErrorMessage_.clear();
+      } else if (!completion->errorMessage.empty()) {
+        std::cerr << "[Autopilot] " << completion->errorMessage << '\n';
+        linearizationErrorMessage_ = std::move(completion->errorMessage);
+      }
+    }
+  }
+}
+
+bool Autopilot::IsLinearizationInProgress() const {
+  return asyncLinearizer_->IsBusy();
+}
+
+const LinearizationResult *Autopilot::GetLinearizationResult() const {
+  return linearization_ ? &*linearization_ : nullptr;
+}
+
+std::string_view Autopilot::GetLinearizationErrorMessage() const {
+  return linearizationErrorMessage_;
+}
+
+bool Autopilot::SubmitLinearization(sim::Aircraft &aircraft,
+    double simulationTimeSec) {
+  if (asyncLinearizer_->IsBusy()) {
+    return false;
   }
 
   sim::FDMState sourceState = aircraft.ExtractFDMState(sim::FDMStateFlags::All);
@@ -159,12 +205,17 @@ void Autopilot::UpdateLinearization(sim::Aircraft &aircraft,
           aircraft.GetConfig(),
           aircraft.GetCurrentCondition(),
           std::move(sourceState))) {
-    lastLinearizationRequestSimTimeSec_ = tick.simTimeSec;
+    lastLinearizationRequestSimTimeSec_ = simulationTimeSec;
+    linearizationErrorMessage_.clear();
+    return true;
   }
+
+  return false;
 }
 
 void Autopilot::InvalidateLinearization() {
   linearization_.reset();
+  linearizationErrorMessage_.clear();
   lastLinearizationRequestSimTimeSec_.reset();
   ++linearizationGeneration_;
 }
@@ -238,9 +289,6 @@ void Autopilot::SyncControllerTrimReferences(const TrimResult &result) {
   if (auto *airspeedHold = GetController<AirspeedHoldController>()) {
     airspeedHold->SetTrimThrottle(result.throttle);
   }
-  if (auto *courseHold = GetController<CourseHoldController>()) {
-    courseHold->SetTrimAileron(result.aileron);
-  }
   if (auto *altitudeHold = GetController<AltitudeHoldController>()) {
     altitudeHold->SetTrimElevator(result.elevator);
   }
@@ -274,6 +322,17 @@ void Autopilot::SetPitchHoldEnabled(bool enabled) {
   }
 }
 
+bool Autopilot::IsCourseHoldEnabled() const {
+  const auto *courseHold = GetController<CourseHoldController>();
+  return courseHold != nullptr && courseHold->IsEnabled();
+}
+
+void Autopilot::SetCourseHoldEnabled(bool enabled) {
+  if (auto *courseHold = GetController<CourseHoldController>()) {
+    courseHold->SetEnabled(enabled);
+  }
+}
+
 void Autopilot::SetRollHoldSettings(const RollHoldSettings &settings) {
   if (auto *rollHold = GetController<RollHoldController>()) {
     rollHold->SetSettings(settings);
@@ -296,5 +355,17 @@ const PitchHoldSettings &Autopilot::GetPitchHoldSettings() const {
   static const PitchHoldSettings DefaultSettings{};
   const auto *pitchHold = GetController<PitchHoldController>();
   return pitchHold != nullptr ? pitchHold->GetSettings() : DefaultSettings;
+}
+
+void Autopilot::SetCourseHoldSettings(const CourseHoldSettings &settings) {
+  if (auto *courseHold = GetController<CourseHoldController>()) {
+    courseHold->SetSettings(settings);
+  }
+}
+
+const CourseHoldSettings &Autopilot::GetCourseHoldSettings() const {
+  static const CourseHoldSettings DefaultSettings{};
+  const auto *courseHold = GetController<CourseHoldController>();
+  return courseHold != nullptr ? courseHold->GetSettings() : DefaultSettings;
 }
 } // namespace gnc

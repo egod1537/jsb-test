@@ -50,7 +50,7 @@ const char *ManualControlLockTooltip(const AutopilotPanelState &autopilotState,
     break;
   case control::ControlAxis::Aileron:
     if (autopilotState.courseHold) {
-      return "Course Hold is controlling aileron.";
+      return "Course Hold is commanding Roll Hold.";
     }
     if (autopilotState.rollHold) {
       return "Roll Hold is controlling aileron.";

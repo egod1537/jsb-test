@@ -36,6 +36,10 @@ public:
     return automaticSimulationHz_;
   }
   void SetAutomaticSimulationHz(double hz) override;
+  bool IsMaximumSimulationSpeedEnabled() const override {
+    return maximumSimulationSpeedEnabled_;
+  }
+  void SetMaximumSimulationSpeedEnabled(bool enabled) override;
   bool ResetSimulation() override;
   bool ResetSimulation(const sim::InitialCondition &initialCondition) override;
   std::uint32_t GetPendingSimulationTickCount() const override {
@@ -61,5 +65,6 @@ private:
   application::SimulationExecutionState simulationExecutionState_ =
       application::SimulationExecutionState::Stopped;
   double automaticSimulationHz_ = sim::DefaultSimulationHz;
+  bool maximumSimulationSpeedEnabled_ = false;
   std::uint32_t pendingSimulationTicks_ = 0;
 };

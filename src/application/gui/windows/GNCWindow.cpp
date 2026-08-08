@@ -34,6 +34,15 @@ gnc::PitchHoldSettings MakePitchHoldSettings(const AutopilotPanelState &state) {
   };
 }
 
+gnc::CourseHoldSettings MakeCourseHoldSettings(
+    const AutopilotPanelState &state) {
+  return {
+      .targetCourseRad = state.courseTargetDeg * DegToRad,
+      .dampingRatio = state.courseHoldDampingRatio,
+      .naturalFrequencyRadPerSec = state.courseHoldNaturalFrequencyRadPerSec,
+  };
+}
+
 bool HasAnyAutopilotHoldEnabled(const AutopilotPanelState &state) {
   return state.rollHold || state.pitchHold || state.yawHold
          || state.altitudeHold || state.courseHold;
@@ -228,6 +237,8 @@ void GNCWindow::OnRender(gui::GUI &gui) {
   autopilot.SetRollHoldSettings(MakeRollHoldSettings(autopilotPanelState_));
   autopilot.SetPitchHoldEnabled(autopilotPanelState_.pitchHold);
   autopilot.SetPitchHoldSettings(MakePitchHoldSettings(autopilotPanelState_));
+  autopilot.SetCourseHoldEnabled(autopilotPanelState_.courseHold);
+  autopilot.SetCourseHoldSettings(MakeCourseHoldSettings(autopilotPanelState_));
   flightControlManager->SetMode(HasAnyAutopilotHoldEnabled(autopilotPanelState_)
                                     ? control::FlightControlMode::Autopilot
                                     : control::FlightControlMode::Manual);

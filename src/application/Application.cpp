@@ -51,6 +51,7 @@ bool Application::Run(const volatile std::sig_atomic_t &running) {
 
   bool succeeded = true;
   double scheduledSimulationHz = automaticSimulationHz_;
+  bool scheduledMaximumSimulationSpeed = maximumSimulationSpeedEnabled_;
   Clock::duration simulationInterval =
       ToSimulationInterval(scheduledSimulationHz);
   const double guiDt = gui_->GetConfig().GetRenderDT();
@@ -63,10 +64,17 @@ bool Application::Run(const volatile std::sig_atomic_t &running) {
   while (succeeded && running && !gui_->ShouldClose()) {
     auto now = Clock::now();
 
+    if (maximumSimulationSpeedEnabled_ != scheduledMaximumSimulationSpeed) {
+      scheduledMaximumSimulationSpeed = maximumSimulationSpeedEnabled_;
+      nextSimulationTick = now + simulationInterval;
+    }
+
     if (automaticSimulationHz_ != scheduledSimulationHz) {
       scheduledSimulationHz = automaticSimulationHz_;
       simulationInterval = ToSimulationInterval(scheduledSimulationHz);
-      nextSimulationTick = now + simulationInterval;
+      if (!maximumSimulationSpeedEnabled_) {
+        nextSimulationTick = now + simulationInterval;
+      }
     }
 
     const bool hasPendingManualTick =
@@ -74,10 +82,26 @@ bool Application::Run(const volatile std::sig_atomic_t &running) {
             == application::SimulationExecutionState::Paused
         && pendingSimulationTicks_ > 0;
 
+    const bool runAtMaximumSpeed =
+        maximumSimulationSpeedEnabled_
+        && simulationExecutionState_
+               == application::SimulationExecutionState::Running;
+
     if (hasPendingManualTick) {
       if (!TickSimulation()) {
         succeeded = false;
       }
+    } else if (runAtMaximumSpeed) {
+      do {
+        if (!TickSimulation()) {
+          succeeded = false;
+          break;
+        }
+        now = Clock::now();
+      } while (running && now < nextGUITick);
+    } else if (simulationExecutionState_
+               == application::SimulationExecutionState::Paused) {
+      nextSimulationTick = now + simulationInterval;
     } else {
       while (now >= nextSimulationTick) {
         if (!TickSimulation()) {
@@ -101,7 +125,9 @@ bool Application::Run(const volatile std::sig_atomic_t &running) {
       } while (nextGUITick <= now);
     }
 
-    std::this_thread::sleep_until(std::min(nextSimulationTick, nextGUITick));
+    if (!runAtMaximumSpeed) {
+      std::this_thread::sleep_until(std::min(nextSimulationTick, nextGUITick));
+    }
   }
 
   Exit();
@@ -196,6 +222,11 @@ void Application::SetAutomaticSimulationHz(double hz) {
   }
 
   automaticSimulationHz_ = ClampAutomaticSimulationHz(hz);
+  maximumSimulationSpeedEnabled_ = false;
+}
+
+void Application::SetMaximumSimulationSpeedEnabled(bool enabled) {
+  maximumSimulationSpeedEnabled_ = enabled;
 }
 
 bool Application::ResetSimulation() {

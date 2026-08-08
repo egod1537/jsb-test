@@ -1,6 +1,7 @@
 #include "flightui/plot/Plot.hpp"
 
 #include "flightui/core/UIElementFactory.hpp"
+#include "flightui/core/UIScale.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -481,7 +482,9 @@ PlotBuilder::operator UIElement() const {
       flags |= ImPlotFlags_NoLegend;
     }
 
-    if (ImPlot::BeginPlot(state.Title.c_str(), ToImVec2(state.Size), flags)) {
+    if (ImPlot::BeginPlot(state.Title.c_str(),
+            ToImVec2(UiSize(state.Size)),
+            flags)) {
       const char *xLabel =
           state.XAxisLabel.empty() ? nullptr : state.XAxisLabel.c_str();
       const char *yLabel =

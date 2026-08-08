@@ -1,6 +1,7 @@
 #include "application/gui/viz/components/AltitudeCueRenderer.hpp"
 
 #include "application/gui/viz/render/LineCanvas.hpp"
+#include "flightui/core/UIScale.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -33,13 +34,11 @@ void DrawGroundRing(viz::LineCanvas &canvas, viz::Vec3 center, float radius,
   constexpr float TwoPi = 6.2831853071795864769F;
 
   for (int segmentIndex = 0; segmentIndex < GroundRingSegments;
-       ++segmentIndex) {
-    const float a0 =
-        TwoPi * static_cast<float>(segmentIndex)
-        / static_cast<float>(GroundRingSegments);
-    const float a1 =
-        TwoPi * static_cast<float>(segmentIndex + 1)
-        / static_cast<float>(GroundRingSegments);
+      ++segmentIndex) {
+    const float a0 = TwoPi * static_cast<float>(segmentIndex)
+                     / static_cast<float>(GroundRingSegments);
+    const float a1 = TwoPi * static_cast<float>(segmentIndex + 1)
+                     / static_cast<float>(GroundRingSegments);
     const viz::Vec3 p0{
         center.x + std::cos(a0) * radius,
         center.y + std::sin(a0) * radius,
@@ -83,10 +82,10 @@ void AltitudeCueRenderer::Render(RenderContext &context) const {
   const float tickSpacing = ChooseTickSpacing(visualAltitude);
   const int tickCount =
       static_cast<int>(std::floor(visualAltitude / tickSpacing));
-  const float tickHalfWidth =
-      std::clamp(visualAltitude * 0.018F, 0.16F, 0.55F);
+  const float tickHalfWidth = std::clamp(visualAltitude * 0.018F, 0.16F, 0.55F);
   for (int tickIndex = 1; tickIndex < tickCount; ++tickIndex) {
-    const float z = AircraftOriginZ - tickSpacing * static_cast<float>(tickIndex);
+    const float z =
+        AircraftOriginZ - tickSpacing * static_cast<float>(tickIndex);
     const Vec3 tickCenter{0.0F, 0.0F, z};
     context.canvas.Line(tickCenter + Vec3{-tickHalfWidth, 0.0F, 0.0F},
         tickCenter + Vec3{tickHalfWidth, 0.0F, 0.0F},
@@ -110,7 +109,8 @@ void AltitudeCueRenderer::Render(RenderContext &context) const {
       "AGL %.0f ft",
       context.snapshot.aircraftState.altitudeAglFt);
   context.canvas.GetDrawList().AddText(
-      ImVec2(projectedLabel->x + 8.0F, projectedLabel->y - 8.0F),
+      ImVec2(projectedLabel->x + FlightUI::Ui(8.0F),
+          projectedLabel->y - FlightUI::Ui(8.0F)),
       IM_COL32(255, 226, 150, 255),
       label);
 }

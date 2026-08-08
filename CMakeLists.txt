@@ -69,6 +69,9 @@ target_link_libraries(implot PUBLIC
 add_library(
   flightui STATIC
   src/flightui/core/UICommon.cpp
+  src/flightui/core/Theme.cpp
+  src/flightui/core/UIFont.cpp
+  src/flightui/core/UIScale.cpp
   src/flightui/core/UIElement.cpp
   src/flightui/layout/Window.cpp
   src/flightui/layout/Panel.cpp
@@ -109,6 +112,13 @@ target_include_directories(
   flightui
   PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+set(INTER_FONT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Inter-Regular.ttf")
+target_compile_definitions(
+  flightui
+  PRIVATE
+  JSB_INTER_FONT_FILE="${INTER_FONT_FILE}"
 )
 
 add_executable(
@@ -156,6 +166,7 @@ add_executable(
   src/application/gui/windows/monitor/FlightDataMonitorWindow.cpp
   src/application/gui/windows/viz/FlightVizWindow.cpp
   src/application/gui/windows/GNCWindow.cpp
+  src/application/gui/windows/LinearizationWindow.cpp
   src/application/gui/windows/samples/DeclarativeDemoWindow.cpp
   src/application/gui/windows/samples/SamplePlotWindow.cpp
   src/application/sim/jsbsim/ControlSystem.cpp
@@ -179,6 +190,20 @@ target_link_libraries(
   libJSBSim
   Eigen3::Eigen
   flightui
+)
+
+add_custom_command(
+  TARGET jsb-flight-console
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory
+          "$<TARGET_FILE_DIR:jsb-flight-console>/assets/fonts"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${INTER_FONT_FILE}"
+          "$<TARGET_FILE_DIR:jsb-flight-console>/assets/fonts/Inter-Regular.ttf"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/LICENSE.txt"
+          "$<TARGET_FILE_DIR:jsb-flight-console>/assets/fonts/LICENSE.txt"
+  VERBATIM
 )
 
 if(WIN32)
@@ -331,6 +356,32 @@ target_link_libraries(
 add_test(
   NAME linearization_state_vector_tests
   COMMAND linearization_state_vector_tests
+)
+
+add_executable(
+  flight_camera_controller_tests
+  tests/FlightCameraControllerTests.cpp
+  src/application/gui/viz/core/Component.cpp
+  src/application/gui/viz/core/GameObject.cpp
+  src/application/gui/viz/render/CameraComponent.cpp
+  src/application/gui/viz/components/FlightCameraController.cpp
+)
+
+target_compile_features(
+  flight_camera_controller_tests
+  PRIVATE
+  cxx_std_20
+)
+
+target_include_directories(
+  flight_camera_controller_tests
+  PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+add_test(
+  NAME flight_camera_controller_tests
+  COMMAND flight_camera_controller_tests
 )
 
 target_include_directories(
